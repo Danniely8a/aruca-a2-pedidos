@@ -1,0 +1,19 @@
+{
+  "name": "aruca-a2-pedidos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plataforma de montaje de pedidos A2 (React + Express + Supabase) desplegable en Vercel",
+  "scripts": {
+    "dev": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "start": "cd server && node src/index.js",
+    "build": "cd client && npm install && npm run build",
+    "seed:demo": "cd server && npm run seed:demo",
+    "seed": "cd server && npm run seed",
+    "test:e2e": "cd server && npm run test:e2e"
+  },
+  "dependencies": {
+    "serverless-http": "^3.2.0"
+  }
+}

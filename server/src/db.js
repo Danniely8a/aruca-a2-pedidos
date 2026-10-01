@@ -24,7 +24,7 @@ function buildConfig(url) {
     ...(process.env.PG_SEARCH_PATH
       ? { options: `-c search_path=${process.env.PG_SEARCH_PATH}` }
       : {}),
-    max: 10,
+    max: process.env.VERCEL ? 1 : 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000
   };

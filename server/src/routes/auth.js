@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { store } from '../store/index.js';
+import { ensureAppSchema } from '../db.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import { asyncHandler, ApiError } from '../middleware/errors.js';
 
@@ -13,6 +14,9 @@ router.post(
     if (!usuario || !password) {
       throw new ApiError(400, 'Usuario y contraseña son obligatorios');
     }
+
+    // En Vercel (serverless) el primer arranque es frío: garantiza la tabla.
+    await ensureAppSchema().catch(() => {});
 
     const user = await store.findUserByLogin(String(usuario).trim());
     const ok = user && (await bcrypt.compare(String(password), user.password_hash));

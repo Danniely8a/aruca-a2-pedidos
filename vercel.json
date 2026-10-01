@@ -1,0 +1,12 @@
+{
+  "framework": "vite",
+  "installCommand": "npm install && cd server && npm install",
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/dist",
+  "cleanUrls": true,
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/api(/.*)?", "dest": "/api/index" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
