@@ -5,7 +5,7 @@
   --fondo: #f3f5fa;
   --superficie: #ffffff;
   --texto: #16202e;
-  --muted: #6b7787;
+  --muted: #545f70;
   --borde: #e3e8f0;
   --ok: #16a34a;
   --warn: #d97706;
@@ -284,6 +284,7 @@ p {
 .login {
   display: grid;
   grid-template-columns: 1.05fr 1fr;
+  grid-template-rows: 1fr auto;
   min-height: 100vh;
 }
 .login-brand {
@@ -375,6 +376,23 @@ p {
   gap: 4px;
   font-size: 0.83rem;
   color: var(--azul-oscuro);
+}
+
+/* ---------- Footer corporativo ---------- */
+.site-footer {
+  border-top: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 13px 20px;
+  margin-top: auto;
+}
+.login .site-footer {
+  grid-column: 1 / -1;
+  background: transparent;
+  border-top: 0;
 }
 
 /* ---------- Shell ---------- */
@@ -510,6 +528,7 @@ p {
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
+  flex: 1;
 }
 .backdrop {
   position: fixed;
@@ -942,6 +961,7 @@ p {
   }
   .login {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
   }
   .login-brand {
     padding: 40px 28px;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Logo from './Logo.jsx';
+import Footer from './Footer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
@@ -84,6 +85,8 @@ export default function Layout() {
         <main className="content">
           <Outlet />
         </main>
+
+        <Footer />
       </div>
     </div>
   );
