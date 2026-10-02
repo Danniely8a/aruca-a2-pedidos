@@ -286,6 +286,18 @@ p {
   grid-template-columns: 1.05fr 1fr;
   grid-template-rows: 1fr auto;
   min-height: 100vh;
+  position: relative;
+}
+.login-status {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: var(--sombra);
 }
 .login-brand {
   background: linear-gradient(150deg, var(--azul) 0%, var(--azul-oscuro) 100%);
@@ -376,6 +388,40 @@ p {
   gap: 4px;
   font-size: 0.83rem;
   color: var(--azul-oscuro);
+}
+
+/* ---------- Indicador de estado del servidor ---------- */
+.server-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.server-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex-shrink: 0;
+}
+.server-status-ok .server-status-dot {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+}
+.server-status-down .server-status-dot {
+  background: var(--err);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16);
+}
+.server-status-check .server-status-dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 /* ---------- Footer corporativo ---------- */

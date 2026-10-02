@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Logo from './Logo.jsx';
 import Footer from './Footer.jsx';
+import ServerStatus from './ServerStatus.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
@@ -76,6 +77,7 @@ export default function Layout() {
             ☰
           </button>
           <div className="topbar-title">Sistema A2 · Pedidos externos</div>
+          <ServerStatus />
           <button className="btn btn-primary" onClick={() => navigate('/pedido')}>
             Montar pedido
             {cart.count > 0 && <span className="badge badge-light">{cart.count}</span>}

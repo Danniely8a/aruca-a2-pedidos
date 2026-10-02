@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
 import Footer from '../components/Footer.jsx';
+import ServerStatus from '../components/ServerStatus.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api/client.js';
 
@@ -37,6 +38,7 @@ export default function Login() {
 
   return (
     <div className="login">
+      <ServerStatus className="login-status" />
       <section className="login-brand">
         <div className="login-brand-inner">
           <div className="logo-tile">
