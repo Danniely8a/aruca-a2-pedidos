@@ -13,7 +13,5 @@
     "seed": "cd server && npm run seed",
     "test:e2e": "cd server && npm run test:e2e"
   },
-  "dependencies": {
-    "serverless-http": "^3.2.0"
-  }
+  "dependencies": {}
 }
