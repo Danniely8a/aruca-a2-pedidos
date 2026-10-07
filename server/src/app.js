@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import catalogRoutes from './routes/catalog.js';
 import orderRoutes from './routes/orders.js';
 import dashboardRoutes from './routes/dashboard.js';
+import settingsRoutes from './routes/settings.js';
 import { ApiError } from './middleware/errors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', catalogRoutes);
 app.use('/api', orderRoutes);
 app.use('/api', dashboardRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // En local (fuera de Vercel) Express también sirve el build del cliente.
 const dist = path.resolve(__dirname, '../../client/dist');

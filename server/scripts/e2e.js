@@ -254,6 +254,125 @@ async function main() {
       (cli1.data.precios || []).length === 0,
       `=${cli1.data.precios?.length}`
     );
+
+    // --- Configuración (solo administradores) ---------------------------
+    const sinTok = await req('/api/settings/empresa');
+    check('configuración sin token → 401', sinTok.status === 401, `=${sinTok.status}`);
+
+    const comoVendedor = await req('/api/settings/empresa', { token: tCarlos });
+    check('configuración como vendedor → 403', comoVendedor.status === 403, `=${comoVendedor.status}`);
+
+    const emp = await req('/api/settings/empresa', { token: tAdmin });
+    check(
+      'admin consulta la empresa',
+      emp.status === 200 && Boolean(emp.data?.codigo),
+      `=${emp.status} ${JSON.stringify(emp.data).slice(0, 90)}`
+    );
+
+    const tiposList = await req('/api/settings/tipos', { token: tAdmin });
+    check(
+      'tipos de operación listados',
+      tiposList.status === 200 && (tiposList.data || []).length > 0,
+      `=${tiposList.status}`
+    );
+
+    const cfg0 = await req('/api/settings/config', { token: tAdmin });
+    check(
+      'config con tipo de operación por defecto = 10 (Pedidos)',
+      cfg0.status === 200 && Number(cfg0.data?.tipo_operacion) === 10,
+      `=${JSON.stringify(cfg0.data).slice(0, 120)}`
+    );
+
+    const cfgMala = await req('/api/settings/config', {
+      method: 'PUT',
+      token: tAdmin,
+      body: { tipo_operacion: 9999 }
+    });
+    check('config con tipo inexistente → 400', cfgMala.status === 400, `=${cfgMala.status}`);
+
+    const cfgOk = await req('/api/settings/config', {
+      method: 'PUT',
+      token: tAdmin,
+      body: { tipo_operacion: 10, modulo_correlativo: 'Pedidos', lista_precios: 3 }
+    });
+    check(
+      'config guardada como «configurado»',
+      cfgOk.status === 200 && cfgOk.data?.fuentes?.tipo_operacion === 'configurado',
+      `=${cfgOk.status} ${JSON.stringify(cfgOk.data?.fuentes)}`
+    );
+    check(
+      'lista de precios guardada = 3',
+      Number(cfgOk.data?.lista_precios) === 3,
+      `=${cfgOk.data?.lista_precios}`
+    );
+
+    const tipoNuevo = await req('/api/settings/tipos', {
+      method: 'POST',
+      token: tAdmin,
+      body: { descripcion: 'TIPO E2E', categoria: 'VENTA' }
+    });
+    check('crear tipo de operación', tipoNuevo.status === 200, `=${tipoNuevo.status}`);
+    const tipoBorrar = await req(`/api/settings/tipos/${tipoNuevo.data}`, {
+      method: 'DELETE',
+      token: tAdmin
+    });
+    check('borrar tipo de operación', tipoBorrar.status === 200, `=${tipoBorrar.status}`);
+    const tipoInexistente = await req('/api/settings/tipos/9999', { method: 'DELETE', token: tAdmin });
+    check('borrar tipo inexistente → 400', tipoInexistente.status === 400, `=${tipoInexistente.status}`);
+
+    const userNuevo = await req('/api/settings/usuarios', {
+      method: 'POST',
+      token: tAdmin,
+      body: {
+        codigo: '999',
+        login: 'e2e@prueba.com',
+        nombre: 'Usuario E2E',
+        rol: 'vendedor',
+        password: 'clave1234'
+      }
+    });
+    check('crear usuario', userNuevo.status === 200, `=${userNuevo.status} ${JSON.stringify(userNuevo.data).slice(0, 80)}`);
+
+    const loginNuevo = await req('/api/auth/login', {
+      method: 'POST',
+      body: { usuario: 'e2e@prueba.com', password: 'clave1234' }
+    });
+    check('el usuario nuevo puede entrar', loginNuevo.status === 200, `=${loginNuevo.status}`);
+
+    const claveNueva = await req(`/api/settings/usuarios/${userNuevo.data}/password`, {
+      method: 'PUT',
+      token: tAdmin,
+      body: { password: 'clave4321' }
+    });
+    check('cambiar contraseña', claveNueva.status === 200, `=${claveNueva.status}`);
+    const loginClave = await req('/api/auth/login', {
+      method: 'POST',
+      body: { usuario: 'e2e@prueba.com', password: 'clave4321' }
+    });
+    check('entra con la contraseña nueva', loginClave.status === 200, `=${loginClave.status}`);
+
+    const userBorrar = await req(`/api/settings/usuarios/${userNuevo.data}`, {
+      method: 'DELETE',
+      token: tAdmin
+    });
+    check('borrar usuario', userBorrar.status === 200, `=${userBorrar.status}`);
+    const loginBorrado = await req('/api/auth/login', {
+      method: 'POST',
+      body: { usuario: 'e2e@prueba.com', password: 'clave4321' }
+    });
+    check('el usuario borrado ya no entra', loginBorrado.status === 401, `=${loginBorrado.status}`);
+
+    const corr = await req('/api/settings/correlativos', { token: tAdmin });
+    check(
+      'correlativos listados',
+      corr.status === 200 && (corr.data || []).length > 0,
+      `=${corr.status}`
+    );
+    check(
+      'el correlativo de Pedidos tiene próximo ≥ 1',
+      (corr.data || []).some((c) => c.modulo === 'Pedidos' && c.proximo >= 1),
+      JSON.stringify((corr.data || [])[0])
+    );
   } finally {
     servidor.kill();
     await new Promise((r) => setTimeout(r, 500));

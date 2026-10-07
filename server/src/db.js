@@ -47,4 +47,11 @@ export async function ensureAppSchema() {
       actualizado_en timestamptz not null default now()
     )
   `);
+  await pool.query(`
+    create table if not exists app_config (
+      clave         text primary key,
+      valor         text not null,
+      actualizado_en timestamptz not null default now()
+    )
+  `);
 }

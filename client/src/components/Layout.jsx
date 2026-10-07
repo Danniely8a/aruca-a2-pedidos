@@ -6,19 +6,22 @@ import ServerStatus from './ServerStatus.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
-const NAV = [
-  { to: '/', label: 'Inicio', icon: '◈' },
-  { to: '/pedido', label: 'Montar pedido', icon: '＋' },
-  { to: '/productos', label: 'Productos', icon: '▦' },
-  { to: '/clientes', label: 'Clientes', icon: '☺' },
-  { to: '/pedidos', label: 'Historial', icon: '≣' }
-];
-
 export default function Layout() {
   const { user, logout } = useAuth();
   const cart = useCart();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  const NAV = [
+    { to: '/', label: 'Inicio', icon: '◈' },
+    { to: '/pedido', label: 'Montar pedido', icon: '＋' },
+    { to: '/productos', label: 'Productos', icon: '▦' },
+    { to: '/clientes', label: 'Clientes', icon: '☺' },
+    { to: '/pedidos', label: 'Historial', icon: '≣' },
+    ...(user?.rol === 'admin'
+      ? [{ to: '/configuracion', label: 'Configuración', icon: '⚙' }]
+      : [])
+  ];
 
   const cerrarSesion = () => {
     logout();

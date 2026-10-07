@@ -23,5 +23,14 @@ export async function crear(pool) {
       actualizado_en timestamptz not null default now()
     )`);
 
+  // Sombras las tablas de la app: a2_test va primero en el search_path, así
+  // una escritura de configuración jamás toca public.app_config.
+  await pool.query(`
+    create table ${ESQUEMA}.app_config (
+      clave         text primary key,
+      valor         text not null,
+      actualizado_en timestamptz not null default now()
+    )`);
+
   return rows.length;
 }

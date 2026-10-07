@@ -23,9 +23,39 @@ const colPrecio = (nivel) => {
   return `icp_p${String(n).padStart(2, '0')}${sufijo}`;
 };
 
+// Configuración de la plataforma persistida en app_config (la edita el
+// administrador desde la pantalla de Configuración). Cache corta para no
+// golpear la base en cada petición.
+let cacheCfg = null;
+let cacheTs = 0;
+
+export function invalidarConfigCache() {
+  cacheCfg = null;
+  cacheTs = 0;
+}
+
+async function cfg() {
+  if (cacheCfg && Date.now() - cacheTs < 30000) return cacheCfg;
+  let tipo = config.orderTipo;
+  let modulo = config.orderModule;
+  let lista = config.priceLevel;
+  try {
+    const { rows } = await q('select clave, valor from app_config');
+    const m = {};
+    rows.forEach((r) => (m[r.clave] = r.valor));
+    if (m.tipo_operacion_pedidos) tipo = Number(m.tipo_operacion_pedidos) || tipo;
+    if (m.modulo_correlativo_pedidos) modulo = m.modulo_correlativo_pedidos;
+    if (m.lista_precios) lista = Math.min(6, Math.max(1, Number(m.lista_precios) || lista));
+  } catch {
+    // app_config todavía no existe: se usan los valores por defecto
+  }
+  cacheCfg = { tipo, modulo, lista };
+  cacheTs = Date.now();
+  return cacheCfg;
+}
+
 // Número de documento: usa arc_correlatives si existe el módulo, si no genera secuencia.
-async function nextDocumento(cliente) {
-  const modulo = config.orderModule;
+async function nextDocumento(cliente, modulo = config.orderModule) {
   const { rows } = await cliente.query(
     'select cor_proximo, cor_emp_codigo from arc_correlatives where cor_modname = $1 for update',
     [modulo]
@@ -214,23 +244,21 @@ export const arcStore = {
       );
     }
     const { rows } = await q(
-      `${sqlProductos(config.priceLevel)} where ${where.join(' and ')} order by i.inv_descripcion limit 500`,
+      `${sqlProductos((await cfg()).lista)} where ${where.join(' and ')} order by i.inv_descripcion limit 500`,
       params
     );
     return rows;
   },
   async getProduct(id) {
-    const { rows } = await q(
-      `${sqlProductos(config.priceLevel)} where i.inv_id_auto = $1`,
-      [id]
-    );
+    const { rows } = await q(`${sqlProductos((await cfg()).lista)} where i.inv_id_auto = $1`, [
+      id
+    ]);
     return rows[0] || null;
   },
   async getProductByCodigo(codigo) {
-    const { rows } = await q(
-      `${sqlProductos(config.priceLevel)} where i.inv_codigo = $1`,
-      [codigo]
-    );
+    const { rows } = await q(`${sqlProductos((await cfg()).lista)} where i.inv_codigo = $1`, [
+      codigo
+    ]);
     return rows[0] || null;
   },
 
@@ -268,10 +296,11 @@ export const arcStore = {
   // Precios "especiales" del cliente: solo los productos donde su lista
   // (cli_preciodefecto) difiere de la lista general (A2_LISTA_PRECIO).
   async customerPrices(clienteId) {
-    const nivel = (await this.nivelDelCliente(clienteId)) ?? config.priceLevel;
-    if (nivel === config.priceLevel) return [];
+    const general = (await cfg()).lista;
+    const nivel = (await this.nivelDelCliente(clienteId)) ?? general;
+    if (nivel === general) return [];
     const clienteCol = colPrecio(nivel);
-    const generalCol = colPrecio(config.priceLevel);
+    const generalCol = colPrecio(general);
     const { rows } = await q(
       `select i.inv_id_auto as producto_id, p.${clienteCol} as precio
          from arc_inventario i
@@ -301,12 +330,13 @@ export const arcStore = {
     try {
       await c.query('begin');
 
-      const { numero } = await nextDocumento(c);
+      const configuracion = await cfg();
+      const { numero } = await nextDocumento(c, configuracion.modulo);
       const auto = await c.query(
         'select coalesce(max(trn_autoincrement), 0) + 1 as n from arc_transacciones'
       );
       const autoincrement = Number(auto.rows[0].n);
-      const tipo = config.orderTipo;
+      const tipo = configuracion.tipo;
       const base = round2(Number(data.subtotal) - Number(data.descuento));
 
       const insertTrn = await c.query(
@@ -402,7 +432,7 @@ export const arcStore = {
 
   async listOrders({ vendedorId = null, q: term = '', estado = '' } = {}) {
     const params = [];
-    const where = [`t.trn_tipo = $${(params.push(config.orderTipo), params.length)}`];
+    const where = [`t.trn_tipo = $${(params.push((await cfg()).tipo), params.length)}`];
 
     if (vendedorId) {
       const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [
@@ -469,7 +499,7 @@ export const arcStore = {
 
   async stats({ vendedorId = null } = {}) {
     let filtro = '';
-    const params = [config.orderTipo];
+    const params = [(await cfg()).tipo];
     if (vendedorId) {
       const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [vendedorId]);
       const codigo = u.rows[0]?.usr_codigo;

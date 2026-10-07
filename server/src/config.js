@@ -18,9 +18,10 @@ export const config = {
   currency: process.env.CURRENCY || '$',
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   // Tipo de operación A2 que identifica los pedidos montados desde la web
-  orderTipo: int(process.env.A2_TIPO_PEDIDO, 1),
+  // (10 = "Pedidos" en arc_tipo_operacion; 1 es "Traslados")
+  orderTipo: int(process.env.A2_TIPO_PEDIDO, 10),
   // Módulo de correlativos en arc_correlatives (si no existe, se genera solo)
-  orderModule: process.env.A2_MODULO_PEDIDO || 'PEDIDO',
+  orderModule: process.env.A2_MODULO_PEDIDO || 'Pedidos',
   // Lista de precios a usar (1..6) y si el precio ya trae impuestos
   priceLevel: Math.min(6, Math.max(1, int(process.env.A2_LISTA_PRECIO, 1))),
   priceWithTax: process.env.A2_PRECIO_CON_IMPUESTO === '1'

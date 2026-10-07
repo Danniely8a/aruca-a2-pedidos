@@ -10,6 +10,28 @@ insert into arc_company (emp_codigo, emp_descripcion, emp_status, emp_fechacreac
 select 'ARUCA', 'ARUCA Maquinaria para Madera', true, now(), now()
 where not exists (select 1 from arc_company);
 
+-- Tipos de operación (catálogo real del A2) -----------------------------
+insert into arc_tipo_operacion (tip_id, tip_descripcion, tip_categoria, tip_afecta_inventario)
+select v.tip_id, v.tip_descripcion, v.tip_categoria, v.tip_afecta_inventario
+  from (values
+  (1,  'Traslados',               'INVENTARIO', true),
+  (2,  'Cargos',                  'INVENTARIO', true),
+  (3,  'Descargos',               'INVENTARIO', true),
+  (4,  'Ajustes',                 'INVENTARIO', true),
+  (5,  'Órdenes de Compras',      'COMPRA',     false),
+  (6,  'Compras',                 'COMPRA',     true),
+  (7,  'Devolución de Compras',   'COMPRA',     true),
+  (8,  'Notas de Entrega en Compras', 'COMPRA', true),
+  (9,  'Presupuestos',            'VENTA',      false),
+  (10, 'Pedidos',                 'VENTA',      false),
+  (11, 'Facturas',                'VENTA',      true),
+  (12, 'Devolución de Ventas',    'VENTA',      true),
+  (13, 'Notas de Entrega en Ventas', 'VENTA',   true),
+  (14, 'Apartados',               'VENTA',      false),
+  (23, 'Órdenes de Servicios',    'SERVICIO',   false)
+) as v(tip_id, tip_descripcion, tip_categoria, tip_afecta_inventario)
+where not exists (select 1 from arc_tipo_operacion);
+
 -- Depósito ---------------------------------------------------------------
 insert into arc_depositos (dep_codigo, dep_descripcion, dep_status, dep_systemdate)
 select '01', 'Depósito principal', true, now()
@@ -123,5 +145,5 @@ where not exists (select 1 from arc_clientes);
 
 -- Correlativo de pedidos -------------------------------------------------
 insert into arc_correlatives (cor_modname, cor_proximo, cor_emp_codigo, cor_fechacreacion, cor_fechasistema, cor_usercreator, cor_namemachine)
-select 'PEDIDO', 1, 'ARUCA', now(), now(), 'seed-demo', 'A2-WEB'
-where not exists (select 1 from arc_correlatives where cor_modname = 'PEDIDO');
+select 'Pedidos', 1, 'ARUCA', now(), now(), 'seed-demo', 'A2-WEB'
+where not exists (select 1 from arc_correlatives where cor_modname = 'Pedidos');
