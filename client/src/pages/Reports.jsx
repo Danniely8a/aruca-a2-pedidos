@@ -3,6 +3,7 @@ import { api } from '../api/client.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { EstadoTag } from './Dashboard.jsx';
+import InformeReporte from '../components/InformeReporte.jsx';
 
 const isoDia = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -64,6 +65,7 @@ export default function Reports() {
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [informe, setInforme] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -139,6 +141,16 @@ export default function Reports() {
             {new Date(`${hasta}T00:00:00`).toLocaleDateString('es-VE')}
             {user?.rol !== 'admin' ? ' · Solo tus pedidos' : ''}
           </p>
+        </div>
+        <div className="page-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => setInforme(true)}
+            disabled={!datos}
+          >
+            Ver informe
+          </button>
         </div>
       </div>
 
@@ -444,6 +456,18 @@ export default function Reports() {
             </div>
           </section>
         </>
+      )}
+
+      {informe && datos && (
+        <InformeReporte
+          datos={datos}
+          currency={cart.currency}
+          agrupacion={agrupacion}
+          desde={desde}
+          hasta={hasta}
+          usuario={user}
+          onClose={() => setInforme(false)}
+        />
       )}
     </div>
   );

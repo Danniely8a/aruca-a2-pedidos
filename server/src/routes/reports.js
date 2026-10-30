@@ -27,7 +27,8 @@ router.get(
 
     const vendedorId = req.user.rol === 'admin' ? null : req.user.id;
     const reporte = await store.reportes({ desde, hasta, vendedorId });
-    res.json(reporte);
+    const empresa = await store.getCompany();
+    res.json({ ...reporte, empresa });
   })
 );
 

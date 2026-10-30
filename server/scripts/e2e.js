@@ -303,6 +303,11 @@ async function main() {
       JSON.stringify(repAdmin.data?.resumen)
     );
     check(
+      'reporte incluye datos de la empresa para el informe',
+      Boolean(repAdmin.data?.empresa?.descripcion && repAdmin.data?.empresa?.idfiscal),
+      JSON.stringify(repAdmin.data?.empresa)
+    );
+    check(
       'reporte con series diaria, semanal y mensual',
       (repAdmin.data?.series?.dia || []).length > 0 &&
         (repAdmin.data?.series?.semana || []).length > 0 &&

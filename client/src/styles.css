@@ -1314,6 +1314,168 @@ p {
 .report-table {
   margin-top: 8px;
 }
+
+/* ---------- Informe imprimible ---------- */
+.informe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(10, 18, 36, 0.55);
+  overflow: auto;
+  padding: 24px 16px;
+}
+.informe-shell {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.informe-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.informe {
+  background: #fff;
+  color: var(--texto);
+  padding: 30px 34px;
+  border-radius: 10px;
+  box-shadow: 0 30px 60px rgba(10, 18, 36, 0.3);
+}
+.informe-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--azul);
+}
+.informe-brand {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.informe-brand img {
+  width: 64px;
+  height: auto;
+  object-fit: contain;
+}
+.informe-brand strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--azul);
+}
+.informe-brand span {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 2px;
+  max-width: 380px;
+}
+.informe-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+.informe-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.informe-meta strong {
+  font-size: 1rem;
+  color: var(--azul);
+}
+.informe-meta span {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.informe-resumen {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin: 18px 0;
+}
+.informe-resumen > div {
+  background: #f7f9ff;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+.informe-resumen span {
+  display: block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.informe-resumen strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--azul);
+  margin-top: 2px;
+}
+.informe-section {
+  margin-top: 18px;
+  break-inside: avoid;
+}
+.informe-section h2 {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--azul);
+  margin-bottom: 8px;
+}
+.informe table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+.informe th {
+  text-align: left;
+  background: var(--azul);
+  color: #fff;
+  padding: 6px 8px;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.informe td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--borde);
+}
+.informe tbody tr:nth-child(even) td {
+  background: #f8faff;
+}
+.informe tfoot td {
+  font-weight: 700;
+  border-top: 1.5px solid var(--azul);
+  background: #f2f6ff;
+}
+.informe .right {
+  text-align: right;
+}
+.informe-dos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.informe-foot {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borde);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.66rem;
+  color: var(--muted);
+  text-align: center;
+}
 .mobile-lines,
 .mobile-order-bar {
   display: none;
@@ -1535,5 +1697,74 @@ p {
   }
   .tabs {
     flex-wrap: wrap;
+  }
+  .informe-overlay {
+    padding: 12px 8px;
+  }
+  .informe {
+    padding: 18px 16px;
+  }
+  .informe-head {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .informe-meta {
+    text-align: left;
+  }
+  .informe-resumen {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .informe-dos {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .informe-toolbar {
+    justify-content: space-between;
+  }
+}
+
+/* ---------- Impresión del informe ---------- */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body > :not(.informe-overlay) {
+    display: none !important;
+  }
+  .informe-overlay {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    padding: 0;
+    background: #fff;
+    overflow: visible;
+  }
+  .informe-shell {
+    max-width: none;
+    margin: 0;
+  }
+  .informe-toolbar {
+    display: none !important;
+  }
+  .informe {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+  }
+  .informe-section {
+    break-inside: avoid;
+  }
+  .informe thead {
+    display: table-header-group;
+  }
+  .informe tr {
+    break-inside: avoid;
   }
 }
