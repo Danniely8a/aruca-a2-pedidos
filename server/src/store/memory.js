@@ -180,6 +180,17 @@ export const memoryStore = {
     );
   },
   getCustomer: async (id) => byId(clientes, id) || null,
+  getCompany: async () => ({
+    id: 1,
+    codigo: 'ARUCA',
+    descripcion: 'ARUCA MAQUINARIA PARA MADERA S.A.',
+    idfiscal: 'J-30358145-5',
+    direccion:
+      'Carretera Nacional Petare Santa Lucía, KM 9, Galpón N° 407, Filas de Mariche, Estado Miranda',
+    telefono1: '(0212) 532.19.96',
+    telefono2: '',
+    email: 'aruca.maquinarias@gmail.com'
+  }),
   findCustomerByRif: async (rif) =>
     clientes.find(
       (c) => String(c.rif).trim().toLowerCase() === String(rif).trim().toLowerCase()

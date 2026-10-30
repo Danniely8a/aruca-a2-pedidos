@@ -193,6 +193,16 @@ async function main() {
     const detalle = await req(`/api/pedidos/${creado.data.pedido.id}`, { token: tCarlos });
     check('detalle con 2 líneas', detalle.data.pedido?.detalles?.length === 2, JSON.stringify(detalle.data.pedido?.detalles));
     check('línea con descripción del producto', Boolean(detalle.data.pedido?.detalles?.[0]?.producto?.descripcion));
+    check(
+      'detalle incluye datos de la empresa para el comprobante',
+      Boolean(detalle.data.empresa?.descripcion && detalle.data.empresa?.idfiscal),
+      JSON.stringify(detalle.data.empresa)
+    );
+    check(
+      'detalle incluye ficha completa del cliente',
+      Boolean(detalle.data.pedido?.cliente?.telefono),
+      JSON.stringify(detalle.data.pedido?.cliente)
+    );
 
     const cambio = await req(`/api/pedidos/${creado.data.pedido.id}/estado`, {
       method: 'PATCH',

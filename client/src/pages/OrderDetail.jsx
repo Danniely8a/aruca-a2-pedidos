@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { EstadoTag } from './Dashboard.jsx';
+import ComprobantePedido from '../components/ComprobantePedido.jsx';
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -13,12 +14,18 @@ export default function OrderDetail() {
   const cart = useCart();
   const toast = useToast();
   const [pedido, setPedido] = useState(null);
+  const [empresa, setEmpresa] = useState(null);
+  const [moneda, setMoneda] = useState(cart.currency);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(true);
 
   const cargar = () => {
     api(`/api/pedidos/${id}`)
-      .then((d) => setPedido(d.pedido))
+      .then((d) => {
+        setPedido(d.pedido);
+        setEmpresa(d.empresa || null);
+        if (d.currency) setMoneda(d.currency);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setCargando(false));
   };
@@ -166,6 +173,8 @@ export default function OrderDetail() {
           </table>
         </div>
       </section>
+
+      <ComprobantePedido pedido={pedido} empresa={empresa} currency={moneda} />
 
       {user.rol === 'admin' && (
         <section className="card">

@@ -294,6 +294,22 @@ export const arcStore = {
     ]);
     return rows[0] || null;
   },
+  async getCompany() {
+    const { rows } = await q(
+      `select emp_idauto as id,
+              emp_codigo as codigo,
+              emp_descripcion as descripcion,
+              emp_idfiscal as idfiscal,
+              emp_direccionf as direccion,
+              emp_telefono1 as telefono1,
+              emp_telefono2 as telefono2,
+              emp_emailempresa as email
+         from arc_company
+        order by emp_idauto
+        limit 1`
+    );
+    return rows[0] || null;
+  },
   async createCustomer(data) {
     const vendedor = await q(
       'select usr_codigo from arc_users where usr_idauto = $1',

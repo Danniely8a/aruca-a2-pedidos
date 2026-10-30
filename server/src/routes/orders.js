@@ -116,8 +116,15 @@ router.get(
     if (req.user.rol !== 'admin' && pedido.vendedor_id !== req.user.id) {
       throw new ApiError(403, 'No tienes acceso a este pedido');
     }
+    // El comprobante necesita la ficha completa del cliente y los datos de la
+    // empresa, no solo lo mínimo que trae el listado de pedidos.
+    if (pedido.cliente_id) {
+      const ficha = await store.getCustomer(pedido.cliente_id);
+      if (ficha) pedido.cliente = { ...pedido.cliente, ...ficha };
+    }
+    const empresa = await store.getCompany();
     const tasa = config.taxRate;
-    res.json({ pedido, tasa, currency: config.currency });
+    res.json({ pedido, empresa, tasa, currency: config.currency });
   })
 );
 

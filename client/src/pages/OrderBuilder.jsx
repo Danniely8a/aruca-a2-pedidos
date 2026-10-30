@@ -107,7 +107,7 @@ export default function OrderBuilder() {
   };
 
   return (
-    <div className="page">
+    <div className="page order-page">
       <div className="page-head">
         <div>
           <h1>Nuevo pedido</h1>
@@ -296,8 +296,9 @@ export default function OrderBuilder() {
                 <p>Busca un producto por código o descripción para agregarlo.</p>
               </div>
             ) : (
-              <div className="table-wrap">
-                <table className="table table-lines">
+              <>
+                <div className="table-wrap desktop-lines">
+                  <table className="table table-lines">
                   <thead>
                     <tr>
                       <th>Código</th>
@@ -378,7 +379,77 @@ export default function OrderBuilder() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+
+                <div className="mobile-lines">
+                  {cart.lines.map((l) => (
+                    <div className="line-card" key={l.producto.id}>
+                      <div className="line-card-head">
+                        <div>
+                          <span className="line-code">{l.producto.codigo}</span>
+                          <strong>{l.producto.descripcion}</strong>
+                          {l.esEspecial && (
+                            <span className="tag tag-especial">precio especial</span>
+                          )}
+                        </div>
+                        <button
+                          className="icon-btn"
+                          title="Quitar"
+                          onClick={() => cart.removeItem(l.producto.id)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="line-card-grid">
+                        <label>
+                          <span>Cantidad</span>
+                          <input
+                            className="input input-num"
+                            type="number"
+                            min="0"
+                            value={l.cantidad}
+                            onChange={(e) =>
+                              cart.setCantidad(l.producto.id, e.target.value)
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span>Precio</span>
+                          <input
+                            className="input input-num input-price"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={l.precioManual ?? ''}
+                            placeholder="Sin precio"
+                            onChange={(e) => cart.setPrecio(l.producto.id, e.target.value)}
+                          />
+                        </label>
+                        <label>
+                          <span>Desc. %</span>
+                          <input
+                            className="input input-num"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={l.descuento}
+                            onChange={(e) =>
+                              cart.setDescuento(l.producto.id, e.target.value)
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="line-card-foot">
+                        <span>Total</span>
+                        <strong>
+                          {cart.currency}
+                          {l.subtotal.toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </section>
 
@@ -443,7 +514,7 @@ export default function OrderBuilder() {
             {error && <div className="alert alert-error">{error}</div>}
 
             <button
-              className="btn btn-primary btn-block btn-lg"
+              className="btn btn-primary btn-block btn-lg enviar-aside"
               onClick={enviar}
               disabled={
                 enviando ||
@@ -474,6 +545,29 @@ export default function OrderBuilder() {
             )}
           </div>
         </aside>
+      </div>
+
+      <div className="mobile-order-bar">
+        {error && <div className="alert alert-error mobile-order-error">{error}</div>}
+        <div className="mobile-order-bar-info">
+          <span>Total del pedido</span>
+          <strong>
+            {cart.currency}
+            {cart.total.toFixed(2)}
+          </strong>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={enviar}
+          disabled={
+            enviando ||
+            cart.lines.length === 0 ||
+            !cart.cliente ||
+            cart.cliente.activo === false
+          }
+        >
+          {enviando ? 'Enviando…' : 'Enviar pedido'}
+        </button>
       </div>
     </div>
   );

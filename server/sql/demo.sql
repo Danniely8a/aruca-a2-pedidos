@@ -6,8 +6,12 @@
 -- =====================================================================
 
 -- Empresa ---------------------------------------------------------------
-insert into arc_company (emp_codigo, emp_descripcion, emp_status, emp_fechacreacion, emp_fechasistema)
-select 'ARUCA', 'ARUCA Maquinaria para Madera', true, now(), now()
+insert into arc_company (emp_codigo, emp_descripcion, emp_idfiscal, emp_direccionf,
+                         emp_telefono1, emp_emailempresa, emp_status,
+                         emp_fechacreacion, emp_fechasistema)
+select 'ARUCA', 'ARUCA Maquinaria para Madera', 'J-30358145-5',
+       'Carretera Nacional Petare Santa Lucía, KM 9, Galpón N° 407, Filas de Mariche, Estado Miranda',
+       '(0212) 532.19.96', 'aruca.maquinarias@gmail.com', true, now(), now()
 where not exists (select 1 from arc_company);
 
 -- Tipos de operación (catálogo real del A2) -----------------------------
