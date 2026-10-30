@@ -124,6 +124,18 @@ pedidos = pedidos.map(decorarPedido);
 
 const byId = (lista, id) => lista.find((x) => x.id === Number(id));
 
+// En modo demo no existen las 6 listas del A2: se simulan con factores para
+// poder probar el selector de precios (mayor = 2, mayor Bs = 4).
+const FACTORES_LISTA = { 1: 1, 2: 0.9, 3: 0.85, 4: 0.8, 5: 0.75, 6: 0.7 };
+const nivelDemo = (n) => {
+  const v = Number(n);
+  return Number.isInteger(v) && v >= 1 && v <= 6 ? v : 1;
+};
+const conPrecioLista = (p, lista) => ({
+  ...p,
+  precio: round2(Number(p.precio) * (FACTORES_LISTA[nivelDemo(lista)] ?? 1))
+});
+
 export const memoryStore = {
   mode: 'demo',
   findUserByLogin: async (login) =>
@@ -136,19 +148,24 @@ export const memoryStore = {
   listCategories: async () =>
     [...new Set(productos.map((p) => p.categoria))].sort(),
 
-  listProducts: async ({ q = '', categoria = '' } = {}) => {
+  listProducts: async ({ q = '', categoria = '', lista } = {}) => {
     const term = q.trim().toLowerCase();
-    return productos.filter(
-      (p) =>
-        p.activo &&
-        (!categoria || p.categoria === categoria) &&
-        (!term ||
-          p.codigo.toLowerCase().includes(term) ||
-          p.descripcion.toLowerCase().includes(term) ||
-          p.categoria.toLowerCase().includes(term))
-    );
+    return productos
+      .filter(
+        (p) =>
+          p.activo &&
+          (!categoria || p.categoria === categoria) &&
+          (!term ||
+            p.codigo.toLowerCase().includes(term) ||
+            p.descripcion.toLowerCase().includes(term) ||
+            p.categoria.toLowerCase().includes(term))
+      )
+      .map((p) => conPrecioLista(p, lista));
   },
-  getProduct: async (id) => byId(productos, id) || null,
+  getProduct: async (id, lista) => {
+    const p = byId(productos, id);
+    return p ? conPrecioLista(p, lista) : null;
+  },
 
   listCustomers: async ({ q = '' } = {}) => {
     const term = q.trim().toLowerCase();

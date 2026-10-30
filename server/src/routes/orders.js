@@ -30,7 +30,10 @@ router.get(
 router.post(
   '/pedidos',
   asyncHandler(async (req, res) => {
-    const { cliente_id, observacion = '', items, vendedor_id } = req.body || {};
+    const { cliente_id, observacion = '', items, vendedor_id, lista } = req.body || {};
+
+    const nLista = Number(lista);
+    const listaSel = Number.isInteger(nLista) && nLista >= 1 && nLista <= 6 ? nLista : null;
 
     if (!cliente_id) throw new ApiError(400, 'Debes seleccionar un cliente');
     if (!Array.isArray(items) || items.length === 0) {
@@ -47,7 +50,7 @@ router.post(
 
     const lineas = [];
     for (const raw of items) {
-      const producto = await store.getProduct(raw.producto_id);
+      const producto = await store.getProduct(raw.producto_id, listaSel);
       if (!producto || producto.activo === false) {
         throw new ApiError(400, `El producto ${raw.producto_id} no existe o está inactivo`);
       }
@@ -55,7 +58,7 @@ router.post(
       if (!Number.isFinite(cantidad) || cantidad <= 0) {
         throw new ApiError(400, `Cantidad inválida para ${producto.descripcion}`);
       }
-      const especial = await store.customerPrice(cliente.id, producto.id);
+      const especial = listaSel ? null : await store.customerPrice(cliente.id, producto.id);
       const precioCatalogo =
         producto.precio != null && Number.isFinite(Number(producto.precio))
           ? Number(producto.precio)

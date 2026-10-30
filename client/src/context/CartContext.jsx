@@ -6,7 +6,7 @@ const STORAGE_KEY = 'a2_cart';
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
-const emptyCart = { cliente: null, precios: {}, items: [], observacion: '' };
+const emptyCart = { cliente: null, precios: {}, items: [], observacion: '', lista: null };
 
 function load() {
   try {
@@ -86,11 +86,14 @@ export function CartProvider({ children }) {
         }
         setCart((c) => ({ ...c, cliente }));
         try {
-          const data = await api(`/api/clientes/${cliente.id}`);
+          const query = cart.lista ? `?lista=${cart.lista}` : '';
+          const data = await api(`/api/clientes/${cliente.id}${query}`);
           const mapa = {};
-          (data.precios || []).forEach((p) => {
-            mapa[p.producto_id] = Number(p.precio);
-          });
+          if (!cart.lista) {
+            (data.precios || []).forEach((p) => {
+              mapa[p.producto_id] = Number(p.precio);
+            });
+          }
           setCart((c) => ({
             ...c,
             cliente: { ...cliente, ...(data.cliente || {}) },
@@ -98,6 +101,49 @@ export function CartProvider({ children }) {
           }));
         } catch {
           setCart((c) => ({ ...c, cliente, precios: {} }));
+        }
+      },
+      async setLista(lista) {
+        const nivel = lista ? Number(lista) : null;
+        try {
+          const data = await api(
+            `/api/productos${nivel ? `?lista=${nivel}` : ''}`
+          );
+          const mapa = {};
+          (data.items || []).forEach((p) => {
+            mapa[p.id] = p.precio == null ? null : Number(p.precio);
+          });
+          setCart((c) => {
+            const items = c.items.map((i) => {
+              if (!(i.producto.id in mapa)) return i;
+              const precio = mapa[i.producto.id];
+              return {
+                ...i,
+                producto: { ...i.producto, precio },
+                precio
+              };
+            });
+            return {
+              ...c,
+              lista: nivel,
+              precios: nivel ? {} : c.precios,
+              items
+            };
+          });
+          if (!nivel && cart.cliente) {
+            const det = await api(`/api/clientes/${cart.cliente.id}`);
+            const mapaEsp = {};
+            (det.precios || []).forEach((p) => {
+              mapaEsp[p.producto_id] = Number(p.precio);
+            });
+            setCart((c) => ({ ...c, precios: mapaEsp }));
+          }
+        } catch {
+          setCart((c) => ({
+            ...c,
+            lista: nivel,
+            precios: nivel ? {} : c.precios
+          }));
         }
       },
       addItem(producto, cantidad = 1) {
@@ -164,7 +210,12 @@ export function CartProvider({ children }) {
         setCart((c) => ({ ...c, observacion }));
       },
       clear() {
-        setCart((c) => ({ ...emptyCart, cliente: c.cliente, precios: c.precios }));
+        setCart((c) => ({
+          ...emptyCart,
+          cliente: c.cliente,
+          precios: c.precios,
+          lista: c.lista
+        }));
       },
       reset() {
         setCart(emptyCart);

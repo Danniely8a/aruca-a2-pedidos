@@ -413,6 +413,43 @@ async function main() {
       'cliente nuevo aparece en la búsqueda',
       (busquedaNuevo.data.items || []).some((x) => x.rif === 'J-99999999-1')
     );
+
+    // --- Selector de listas de precios (mayor = 2, mayor Bs = 4) --------
+    const prodLista2 = await req('/api/productos?q=P-1001&lista=2', { token: tAdmin });
+    const p1lista2 = prodLista2.data.items.find((x) => x.codigo === 'P-1001');
+    const esperadoLista2 = Math.round(Number(p1.precio) * 0.92 * 100) / 100;
+    check(
+      'catálogo con lista 2 devuelve el precio mayor',
+      Number(p1lista2?.precio) === esperadoLista2,
+      `=${p1lista2?.precio} esperado=${esperadoLista2}`
+    );
+
+    const pedidoLista = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        lista: 2,
+        items: [
+          { producto_id: p1?.id, cantidad: 1, descuento: 0, precio: Number(p1.precio) }
+        ]
+      }
+    });
+    check(
+      'pedido con lista 2 usa el precio mayor',
+      pedidoLista.status === 201 &&
+        Number(pedidoLista.data?.totales?.subtotal) === esperadoLista2,
+      `=${pedidoLista.data?.totales?.subtotal} esperado=${esperadoLista2}`
+    );
+
+    const detalleLista = await req(`/api/clientes/${cli2?.id}?lista=4`, {
+      token: tAdmin
+    });
+    check(
+      'lista manual desactiva los precios negociados del cliente',
+      (detalleLista.data.precios || []).length === 0,
+      `=${detalleLista.data.precios?.length}`
+    );
   } finally {
     servidor.kill();
     await new Promise((r) => setTimeout(r, 500));

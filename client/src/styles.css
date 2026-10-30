@@ -1104,6 +1104,26 @@ p {
   font-weight: 700;
   color: var(--azul);
 }
+.precio-box {
+  margin-top: 14px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.precio-box-head strong {
+  display: block;
+}
+.precio-box-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.83rem;
+  margin-top: 3px;
+}
 .combo-item:disabled {
   opacity: 0.55;
   cursor: not-allowed;

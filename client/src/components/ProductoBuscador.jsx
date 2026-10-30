@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import { useCart } from '../context/CartContext.jsx';
 
-export default function ProductoBuscador({ onSelect }) {
+export default function ProductoBuscador({ onSelect, lista }) {
   const cart = useCart();
   const [q, setQ] = useState('');
   const [items, setItems] = useState([]);
@@ -15,7 +15,9 @@ export default function ProductoBuscador({ onSelect }) {
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const data = await api(`/api/productos?q=${encodeURIComponent(q)}`);
+        const params = new URLSearchParams({ q });
+        if (lista) params.set('lista', lista);
+        const data = await api(`/api/productos?${params.toString()}`);
         if (!cancel) setItems(data.items || []);
       } catch {
         if (!cancel) setItems([]);
@@ -27,7 +29,7 @@ export default function ProductoBuscador({ onSelect }) {
       cancel = true;
       clearTimeout(t);
     };
-  }, [q]);
+  }, [q, lista]);
 
   useEffect(() => {
     const onClick = (e) => {

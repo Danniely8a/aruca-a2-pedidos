@@ -232,7 +232,7 @@ export const arcStore = {
     return rows.map((r) => r.cat_descripcion);
   },
 
-  async listProducts({ q: term = '', categoria = '' } = {}) {
+  async listProducts({ q: term = '', categoria = '', lista } = {}) {
     const params = [];
     const where = ['i.inv_status is distinct from false'];
     if (categoria) {
@@ -247,22 +247,21 @@ export const arcStore = {
         `(i.inv_codigo ilike $${n} or i.inv_descripcion ilike $${n} or i.inv_categoria ilike $${n})`
       );
     }
+    const nivel = nivelValido(lista) ?? (await cfg()).lista;
     const { rows } = await q(
-      `${sqlProductos((await cfg()).lista)} where ${where.join(' and ')} order by i.inv_descripcion limit 500`,
+      `${sqlProductos(nivel)} where ${where.join(' and ')} order by i.inv_descripcion limit 500`,
       params
     );
     return rows;
   },
-  async getProduct(id) {
-    const { rows } = await q(`${sqlProductos((await cfg()).lista)} where i.inv_id_auto = $1`, [
-      id
-    ]);
+  async getProduct(id, lista) {
+    const nivel = nivelValido(lista) ?? (await cfg()).lista;
+    const { rows } = await q(`${sqlProductos(nivel)} where i.inv_id_auto = $1`, [id]);
     return rows[0] || null;
   },
-  async getProductByCodigo(codigo) {
-    const { rows } = await q(`${sqlProductos((await cfg()).lista)} where i.inv_codigo = $1`, [
-      codigo
-    ]);
+  async getProductByCodigo(codigo, lista) {
+    const nivel = nivelValido(lista) ?? (await cfg()).lista;
+    const { rows } = await q(`${sqlProductos(nivel)} where i.inv_codigo = $1`, [codigo]);
     return rows[0] || null;
   },
 
@@ -365,9 +364,9 @@ export const arcStore = {
   },
 
   // Precios "especiales" del cliente: solo los productos donde su lista
-  // (cli_preciodefecto) difiere de la lista general (A2_LISTA_PRECIO).
-  async customerPrices(clienteId) {
-    const general = (await cfg()).lista;
+  // (cli_preciodefecto) difiere de la lista base del pedido.
+  async customerPrices(clienteId, lista) {
+    const general = nivelValido(lista) ?? (await cfg()).lista;
     const nivel = (await this.nivelDelCliente(clienteId)) ?? general;
     if (nivel === general) return [];
     const clienteCol = colPrecio(nivel);

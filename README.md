@@ -115,12 +115,12 @@ Los usuarios se guardan en `arc_users` y sus contraseñas (hash bcrypt) en la ta
 |---|---|---|
 | POST | `/api/auth/login` | `{ usuario, password }` → token JWT |
 | GET | `/api/auth/me` | Usuario del token |
-| GET | `/api/productos?q=&categoria=` | Catálogo con precio de lista |
+| GET | `/api/productos?q=&categoria=&lista=` | Catálogo con precio de la lista indicada (1..6) o la lista por defecto |
 | GET | `/api/productos/categorias` | Categorías |
 | GET | `/api/clientes?q=` | Clientes con zona y vendedor |
 | POST | `/api/clientes` | Registra cliente nuevo (nombre, RIF, teléfono, dirección, correo, estado, tipo de contribuyente) |
 | GET | `/api/clientes/:id` | Cliente + precios especiales de su lista |
-| POST | `/api/pedidos` | Crea pedido (cliente, items, precios, descuentos) |
+| POST | `/api/pedidos` | Crea pedido (cliente, items, precios, descuentos; `lista` opcional 1..6) |
 | GET | `/api/pedidos?todos=1` | Historial (admin ve todos) |
 | GET | `/api/pedidos/:id` | Detalle con líneas del A2 |
 | PATCH | `/api/pedidos/:id/estado` | Cambia estado (solo admin) |

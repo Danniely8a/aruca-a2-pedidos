@@ -9,8 +9,8 @@ router.use(requireAuth);
 router.get(
   '/productos',
   asyncHandler(async (req, res) => {
-    const { q = '', categoria = '' } = req.query;
-    const items = await store.listProducts({ q, categoria });
+    const { q = '', categoria = '', lista } = req.query;
+    const items = await store.listProducts({ q, categoria, lista });
     res.json({ items, total: items.length });
   })
 );
@@ -84,11 +84,18 @@ router.get(
     const cliente = await store.getCustomer(req.params.id);
     if (!cliente) throw new ApiError(404, 'Cliente no encontrado');
 
+    // Si el vendedor elige una lista manual (precio mayor / mayor Bs), esa
+    // lista manda y no se aplican los precios negociados del cliente.
+    const n = Number(req.query.lista);
+    const lista = Number.isInteger(n) && n >= 1 && n <= 6 ? n : null;
+
     let precios = [];
-    if (store.customerPrices) {
-      precios = await store.customerPrices(cliente.id);
-    } else {
-      precios = (await store.listProducts()).map((p) => ({ producto_id: p.id })).filter(Boolean);
+    if (!lista) {
+      if (store.customerPrices) {
+        precios = await store.customerPrices(cliente.id);
+      } else {
+        precios = (await store.listProducts()).map((p) => ({ producto_id: p.id })).filter(Boolean);
+      }
     }
     res.json({ cliente, precios });
   })

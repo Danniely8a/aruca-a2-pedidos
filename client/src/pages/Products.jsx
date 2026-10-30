@@ -28,6 +28,7 @@ export default function Products() {
       const params = new URLSearchParams();
       if (q) params.set('q', q);
       if (categoria) params.set('categoria', categoria);
+      if (cart.lista) params.set('lista', cart.lista);
       api(`/api/productos?${params.toString()}`)
         .then((d) => {
           if (!cancel) setItems(d.items || []);
@@ -39,7 +40,7 @@ export default function Products() {
       cancel = true;
       clearTimeout(t);
     };
-  }, [q, categoria]);
+  }, [q, categoria, cart.lista]);
 
   const agregar = (p) => {
     cart.addItem(p);

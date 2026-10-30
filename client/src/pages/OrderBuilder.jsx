@@ -6,6 +6,8 @@ import { useToast } from '../context/ToastContext.jsx';
 import ClienteSelector from '../components/ClienteSelector.jsx';
 import ProductoBuscador from '../components/ProductoBuscador.jsx';
 
+const ETIQUETA_LISTA = { 2: 'Precio mayor', 4: 'Mayor Bs' };
+
 const nuevoClienteVacio = {
   nombre: '',
   rif: '',
@@ -91,6 +93,7 @@ export default function OrderBuilder() {
       const data = await post('/api/pedidos', {
         cliente_id: cart.cliente.id,
         observacion: cart.observacion,
+        lista: cart.lista || undefined,
         items
       });
       cart.reset();
@@ -242,6 +245,42 @@ export default function OrderBuilder() {
               </div>
               <span className="moneda-symbol">{cart.currency}</span>
             </div>
+
+            <div className="precio-box">
+              <div className="precio-box-head">
+                <div>
+                  <strong>Lista de precios</strong>
+                  <span>
+                    {cart.lista
+                      ? `Usando «${ETIQUETA_LISTA[cart.lista] || `lista ${cart.lista}`}» en todo el pedido.`
+                      : 'Usando la lista automática del cliente.'}
+                  </span>
+                </div>
+              </div>
+              <div className="tabs">
+                <button
+                  type="button"
+                  className={`tab ${!cart.lista ? 'active' : ''}`}
+                  onClick={() => cart.setLista(null)}
+                >
+                  Automático
+                </button>
+                <button
+                  type="button"
+                  className={`tab ${cart.lista === 2 ? 'active' : ''}`}
+                  onClick={() => cart.setLista(2)}
+                >
+                  Precio mayor
+                </button>
+                <button
+                  type="button"
+                  className={`tab ${cart.lista === 4 ? 'active' : ''}`}
+                  onClick={() => cart.setLista(4)}
+                >
+                  Mayor Bs
+                </button>
+              </div>
+            </div>
           </section>
 
           <section className="card">
@@ -250,7 +289,7 @@ export default function OrderBuilder() {
               <span className="muted">{cart.lines.length} línea(s)</span>
             </div>
 
-            <ProductoBuscador onSelect={(p) => cart.addItem(p)} />
+            <ProductoBuscador lista={cart.lista} onSelect={(p) => cart.addItem(p)} />
 
             {cart.lines.length === 0 ? (
               <div className="empty-state">
@@ -363,6 +402,14 @@ export default function OrderBuilder() {
             <div className="total-row">
               <span>Moneda</span>
               <span>USD ({cart.currency})</span>
+            </div>
+            <div className="total-row">
+              <span>Lista de precios</span>
+              <span>
+                {cart.lista
+                  ? ETIQUETA_LISTA[cart.lista] || `Lista ${cart.lista}`
+                  : 'Automática'}
+              </span>
             </div>
             <div className="total-row">
               <span>Subtotal</span>
