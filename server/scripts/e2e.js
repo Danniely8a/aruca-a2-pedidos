@@ -373,6 +373,46 @@ async function main() {
       (corr.data || []).some((c) => c.modulo === 'Pedidos' && c.proximo >= 1),
       JSON.stringify((corr.data || [])[0])
     );
+
+    // --- Registro de cliente nuevo desde la web --------------------------
+    const nuevo = await req('/api/clientes', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        nombre: 'Cliente Web E2E',
+        rif: 'J-99999999-1',
+        telefono: '0212-0000000',
+        direccion: 'Calle de prueba 1',
+        correo: 'nuevo@correo.com',
+        estado: 'activo',
+        tipo_contribuyente: 'especial',
+        moneda: 'USD'
+      }
+    });
+    check('registrar cliente nuevo → 201', nuevo.status === 201, JSON.stringify(nuevo.data));
+    check(
+      'cliente nuevo con correo, tipo de contribuyente y estado',
+      nuevo.data.cliente?.correo === 'nuevo@correo.com' &&
+        nuevo.data.cliente?.tipo_contribuyente === 'especial' &&
+        nuevo.data.cliente?.activo === true,
+      JSON.stringify(nuevo.data.cliente)
+    );
+    check('código de cliente generado', Boolean(nuevo.data.cliente?.codigo), `=${nuevo.data.cliente?.codigo}`);
+
+    const duplicado = await req('/api/clientes', {
+      method: 'POST',
+      token: tCarlos,
+      body: { nombre: 'Otro nombre', rif: 'J-99999999-1' }
+    });
+    check('RIF duplicado → 409', duplicado.status === 409, `=${duplicado.status}`);
+
+    const busquedaNuevo = await req('/api/clientes?q=Cliente Web E2E', {
+      token: tAdmin
+    });
+    check(
+      'cliente nuevo aparece en la búsqueda',
+      (busquedaNuevo.data.items || []).some((x) => x.rif === 'J-99999999-1')
+    );
   } finally {
     servidor.kill();
     await new Promise((r) => setTimeout(r, 500));

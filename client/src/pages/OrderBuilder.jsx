@@ -4,6 +4,18 @@ import { post } from '../api/client.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ClienteSelector from '../components/ClienteSelector.jsx';
+import ProductoBuscador from '../components/ProductoBuscador.jsx';
+
+const nuevoClienteVacio = {
+  nombre: '',
+  rif: '',
+  telefono: '',
+  direccion: '',
+  correo: '',
+  estado: 'activo',
+  tipo_contribuyente: 'ordinario',
+  moneda: 'USD'
+};
 
 export default function OrderBuilder() {
   const cart = useCart();
@@ -11,11 +23,45 @@ export default function OrderBuilder() {
   const navigate = useNavigate();
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
+  const [modoCliente, setModoCliente] = useState('existente');
+  const [nuevo, setNuevo] = useState(nuevoClienteVacio);
+  const [creando, setCreando] = useState(false);
+  const [errorCliente, setErrorCliente] = useState('');
+
+  const campo = (name) => ({
+    value: nuevo[name],
+    onChange: (e) => setNuevo((n) => ({ ...n, [name]: e.target.value }))
+  });
+
+  const registrarCliente = async (e) => {
+    e.preventDefault();
+    setErrorCliente('');
+    if (!nuevo.nombre.trim() || !nuevo.rif.trim()) {
+      setErrorCliente('El nombre y el RIF del cliente son obligatorios.');
+      return;
+    }
+    setCreando(true);
+    try {
+      const data = await post('/api/clientes', nuevo);
+      await cart.setCliente(data.cliente);
+      setNuevo(nuevoClienteVacio);
+      setModoCliente('existente');
+      toast.show(`Cliente ${data.cliente.nombre} registrado`);
+    } catch (err) {
+      setErrorCliente(err.message);
+    } finally {
+      setCreando(false);
+    }
+  };
 
   const enviar = async () => {
     setError('');
     if (!cart.cliente) {
-      setError('Selecciona el cliente del pedido.');
+      setError('Selecciona o registra el cliente del pedido.');
+      return;
+    }
+    if (cart.cliente.activo === false) {
+      setError('El cliente está inactivo. Actívalo en el A2 antes de enviar el pedido.');
       return;
     }
     const items = cart.lines
@@ -48,7 +94,7 @@ export default function OrderBuilder() {
         items
       });
       cart.reset();
-      toast.show(`Pedido ${data.pedido.numero} enviado correctamente`);
+      toast.show(`Pedido ${data.pedido.numero} completado y enviado al A2`);
       navigate(`/pedidos/${data.pedido.id}`);
     } catch (e) {
       setError(e.message);
@@ -61,11 +107,11 @@ export default function OrderBuilder() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Montar pedido</h1>
-          <p className="muted">Cliente → productos → envío al sistema A2</p>
+          <h1>Nuevo pedido</h1>
+          <p className="muted">Cliente → moneda → productos → envío al sistema A2</p>
         </div>
         <Link to="/productos" className="btn btn-ghost">
-          Agregar más productos
+          Ver catálogo
         </Link>
       </div>
 
@@ -74,55 +120,176 @@ export default function OrderBuilder() {
           <section className="card">
             <div className="card-head">
               <h2>1. Cliente</h2>
+              <div className="tabs">
+                <button
+                  type="button"
+                  className={`tab ${modoCliente === 'existente' ? 'active' : ''}`}
+                  onClick={() => setModoCliente('existente')}
+                >
+                  Existente
+                </button>
+                <button
+                  type="button"
+                  className={`tab ${modoCliente === 'nuevo' ? 'active' : ''}`}
+                  onClick={() => setModoCliente('nuevo')}
+                >
+                  Cliente nuevo
+                </button>
+              </div>
             </div>
-            <ClienteSelector
-              value={cart.cliente?.id || null}
-              onChange={(c) => cart.setCliente(c)}
-              autoFocus={!cart.cliente}
-            />
-            {cart.cliente && Object.keys(cart.precios).length > 0 && (
-              <p className="hint">
-                Este cliente tiene {Object.keys(cart.precios).length} producto(s) con
-                precio especial aplicado automáticamente.
-              </p>
+
+            {modoCliente === 'existente' ? (
+              <>
+                <ClienteSelector
+                  value={cart.cliente?.id || null}
+                  onChange={(c) => cart.setCliente(c)}
+                  autoFocus={!cart.cliente}
+                />
+                {cart.cliente && Object.keys(cart.precios).length > 0 && (
+                  <p className="hint">
+                    Este cliente tiene {Object.keys(cart.precios).length} producto(s) con
+                    precio especial aplicado automáticamente.
+                  </p>
+                )}
+              </>
+            ) : (
+              <form onSubmit={registrarCliente}>
+                {errorCliente && (
+                  <div className="alert alert-error">{errorCliente}</div>
+                )}
+                <div className="form-grid">
+                  <label className="field span-2">
+                    <span>Nombre del cliente *</span>
+                    <input
+                      className="input"
+                      placeholder="Razón social o nombre comercial"
+                      required
+                      {...campo('nombre')}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>RIF *</span>
+                    <input
+                      className="input"
+                      placeholder="J-12345678-9"
+                      required
+                      {...campo('rif')}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Teléfono</span>
+                    <input
+                      className="input"
+                      placeholder="0212-5550000"
+                      {...campo('telefono')}
+                    />
+                  </label>
+                  <label className="field span-2">
+                    <span>Dirección</span>
+                    <input
+                      className="input"
+                      placeholder="Avenida, sector, número"
+                      {...campo('direccion')}
+                    />
+                  </label>
+                  <label className="field span-2">
+                    <span>Correo</span>
+                    <input
+                      className="input"
+                      type="email"
+                      placeholder="cliente@correo.com"
+                      {...campo('correo')}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Estado del cliente</span>
+                    <select className="input" {...campo('estado')}>
+                      <option value="activo">Activo</option>
+                      <option value="inactivo">Inactivo</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Tipo de contribuyente</span>
+                    <select className="input" {...campo('tipo_contribuyente')}>
+                      <option value="ordinario">Ordinario</option>
+                      <option value="especial">Especial</option>
+                    </select>
+                  </label>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  disabled={creando}
+                  type="submit"
+                >
+                  {creando ? 'Registrando…' : 'Registrar cliente y continuar'}
+                </button>
+              </form>
             )}
           </section>
 
           <section className="card">
             <div className="card-head">
-              <h2>2. Productos del pedido</h2>
+              <h2>2. Moneda</h2>
+              <span className="tag tag-aprobado">USD</span>
+            </div>
+            <div className="moneda-box">
+              <div>
+                <strong>Dólares estadounidenses (USD)</strong>
+                <span>
+                  Moneda que admite el pedido. Los precios se expresan con el símbolo
+                  «{cart.currency}».
+                </span>
+              </div>
+              <span className="moneda-symbol">{cart.currency}</span>
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="card-head">
+              <h2>3. Productos del pedido</h2>
               <span className="muted">{cart.lines.length} línea(s)</span>
             </div>
 
+            <ProductoBuscador onSelect={(p) => cart.addItem(p)} />
+
             {cart.lines.length === 0 ? (
               <div className="empty-state">
-                <p>Todavía no has agregado productos.</p>
-                <Link to="/productos" className="btn btn-primary">
-                  Ir al catálogo
-                </Link>
+                <p>Busca un producto por código o descripción para agregarlo.</p>
               </div>
             ) : (
               <div className="table-wrap">
                 <table className="table table-lines">
                   <thead>
                     <tr>
-                      <th>Producto</th>
-                      <th className="right">Precio</th>
+                      <th>Código</th>
+                      <th>Descripción</th>
                       <th className="center">Cantidad</th>
+                      <th className="right">Precio</th>
                       <th className="center">Desc. %</th>
-                      <th className="right">Subtotal</th>
+                      <th className="right">Total</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {cart.lines.map((l) => (
                       <tr key={l.producto.id}>
+                        <td className="nowrap">
+                          <strong>{l.producto.codigo}</strong>
+                        </td>
                         <td>
-                          <strong>{l.producto.descripcion}</strong>
-                          <div className="sub">
-                            {l.producto.codigo}
-                            {l.esEspecial && <span className="tag tag-especial">precio especial</span>}
-                          </div>
+                          {l.producto.descripcion}
+                          {l.esEspecial && (
+                            <span className="tag tag-especial">precio especial</span>
+                          )}
+                        </td>
+                        <td className="center">
+                          <input
+                            className="input input-num"
+                            type="number"
+                            min="0"
+                            value={l.cantidad}
+                            onChange={(e) => cart.setCantidad(l.producto.id, e.target.value)}
+                          />
                         </td>
                         <td className="right">
                           <input
@@ -135,15 +302,6 @@ export default function OrderBuilder() {
                             onChange={(e) =>
                               cart.setPrecio(l.producto.id, e.target.value)
                             }
-                          />
-                        </td>
-                        <td className="center">
-                          <input
-                            className="input input-num"
-                            type="number"
-                            min="0"
-                            value={l.cantidad}
-                            onChange={(e) => cart.setCantidad(l.producto.id, e.target.value)}
                           />
                         </td>
                         <td className="center">
@@ -187,7 +345,7 @@ export default function OrderBuilder() {
 
           <section className="card">
             <div className="card-head">
-              <h2>3. Observaciones</h2>
+              <h2>Observaciones</h2>
             </div>
             <textarea
               className="input textarea"
@@ -202,6 +360,10 @@ export default function OrderBuilder() {
         <aside className="builder-side">
           <div className="card totals">
             <h2>Resumen</h2>
+            <div className="total-row">
+              <span>Moneda</span>
+              <span>USD ({cart.currency})</span>
+            </div>
             <div className="total-row">
               <span>Subtotal</span>
               <span>
@@ -236,10 +398,18 @@ export default function OrderBuilder() {
             <button
               className="btn btn-primary btn-block btn-lg"
               onClick={enviar}
-              disabled={enviando || cart.lines.length === 0}
+              disabled={
+                enviando ||
+                cart.lines.length === 0 ||
+                !cart.cliente ||
+                cart.cliente.activo === false
+              }
             >
-              {enviando ? 'Enviando…' : 'Enviar pedido al sistema A2'}
+              {enviando ? 'Enviando…' : 'Enviar pedido'}
             </button>
+            <p className="hint">
+              Al enviar, el pedido queda completado y registrado en el sistema A2.
+            </p>
             <button
               className="btn btn-ghost btn-block"
               onClick={() => cart.clear()}
@@ -248,7 +418,12 @@ export default function OrderBuilder() {
               Vaciar productos
             </button>
             {!cart.cliente && (
-              <p className="hint">Recuerda seleccionar el cliente antes de enviar.</p>
+              <p className="hint">Recuerda seleccionar o registrar el cliente.</p>
+            )}
+            {cart.cliente && cart.cliente.activo === false && (
+              <p className="hint hint-error">
+                El cliente está inactivo y no puede recibir pedidos.
+              </p>
             )}
           </div>
         </aside>

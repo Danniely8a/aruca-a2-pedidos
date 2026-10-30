@@ -54,4 +54,16 @@ export async function ensureAppSchema() {
       actualizado_en timestamptz not null default now()
     )
   `);
+
+  // Datos del cliente que no existen en las tablas del A2 (correo y tipo de
+  // contribuyente). Se enlazan por cli_id_auto sin alterar arc_clientes.
+  await pool.query(`
+    create table if not exists app_clientes_extra (
+      id_cliente          bigint primary key,
+      email               text,
+      tipo_contribuyente  text not null default 'ordinario',
+      moneda              text not null default 'USD',
+      actualizado_en      timestamptz not null default now()
+    )
+  `);
 }

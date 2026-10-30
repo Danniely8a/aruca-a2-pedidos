@@ -999,6 +999,116 @@ p {
   background: #fff;
 }
 
+/* ---------- Formulario de pedido ---------- */
+.tabs {
+  display: inline-flex;
+  background: #eef2f9;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+}
+.tab {
+  border: 0;
+  background: none;
+  padding: 7px 13px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tab:hover {
+  color: var(--azul);
+}
+.tab.active {
+  background: #fff;
+  color: var(--azul);
+  box-shadow: 0 1px 3px rgba(16, 32, 64, 0.12);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+.form-grid .field {
+  margin-bottom: 14px;
+}
+.select.capitalize {
+  text-transform: capitalize;
+}
+.cliente-card {
+  background: #f7f9ff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 15px 16px;
+}
+.cliente-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.cliente-card-head strong {
+  display: block;
+  font-size: 1rem;
+}
+.cliente-card-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.83rem;
+  margin-top: 3px;
+}
+.cliente-kv {
+  border-top: 1px dashed var(--borde);
+  padding-top: 14px;
+}
+.cliente-kv .tag {
+  margin-top: 2px;
+}
+.capitalize {
+  text-transform: capitalize;
+}
+.hint-error {
+  color: var(--err);
+}
+.nowrap {
+  white-space: nowrap;
+}
+.moneda-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #f7f9ff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.moneda-box strong {
+  display: block;
+}
+.moneda-box span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.83rem;
+  margin-top: 3px;
+}
+.moneda-symbol {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--azul);
+}
+.combo-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1024px) {
   .builder,
@@ -1056,5 +1166,14 @@ p {
   }
   .login-brand-inner {
     text-align: center;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid .span-2 {
+    grid-column: auto;
+  }
+  .card-head {
+    flex-wrap: wrap;
   }
 }

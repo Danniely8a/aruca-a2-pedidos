@@ -91,7 +91,11 @@ export function CartProvider({ children }) {
           (data.precios || []).forEach((p) => {
             mapa[p.producto_id] = Number(p.precio);
           });
-          setCart((c) => ({ ...c, cliente, precios: mapa }));
+          setCart((c) => ({
+            ...c,
+            cliente: { ...cliente, ...(data.cliente || {}) },
+            precios: mapa
+          }));
         } catch {
           setCart((c) => ({ ...c, cliente, precios: {} }));
         }

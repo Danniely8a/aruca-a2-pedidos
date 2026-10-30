@@ -32,12 +32,12 @@ const usuarios = [
 ];
 
 const clientes = [
-  { id: 1, codigo: 'C-0001', nombre: 'Almacén El Progreso', rif: 'J-30123456-7', telefono: '0212-5550101', ciudad: 'Caracas', direccion: 'Av. Bolívar, Urb. El Rosal', vendedor_id: 2, activo: true },
-  { id: 2, codigo: 'C-0002', nombre: 'Distribuidora La Fortuna', rif: 'J-30987654-3', telefono: '0241-5550202', ciudad: 'Valencia', direccion: 'Calle 50, Zona Industrial', vendedor_id: 2, activo: true },
-  { id: 3, codigo: 'C-0003', nombre: 'Supermercado Doña Rosa', rif: 'J-29876543-1', telefono: '0212-5550303', ciudad: 'Caracas', direccion: 'Av. Sucre, Coche', vendedor_id: 3, activo: true },
-  { id: 4, codigo: 'C-0004', nombre: 'Comercializadora Andes', rif: 'J-27654321-9', telefono: '0261-5550404', ciudad: 'Maracaibo', direccion: 'Av. 5 de Julio, Sector Norte', vendedor_id: 3, activo: true },
-  { id: 5, codigo: 'C-0005', nombre: 'Tienda El Ahorro', rif: 'J-25432198-5', telefono: '0212-5550505', ciudad: 'Barquisimeto', direccion: 'Calle 20 con Av. Libertador', vendedor_id: 2, activo: true },
-  { id: 6, codigo: 'C-0006', nombre: 'Mayorista El Triunfo', rif: 'J-21345678-2', telefono: '0414-5550606', ciudad: 'Maracay', direccion: 'Av. Bolívar, Choroní', vendedor_id: 3, activo: true }
+  { id: 1, codigo: 'C-0001', nombre: 'Almacén El Progreso', rif: 'J-30123456-7', telefono: '0212-5550101', ciudad: 'Caracas', direccion: 'Av. Bolívar, Urb. El Rosal', correo: 'compras@elprogreso.com', tipo_contribuyente: 'ordinario', moneda: 'USD', vendedor_id: 2, activo: true },
+  { id: 2, codigo: 'C-0002', nombre: 'Distribuidora La Fortuna', rif: 'J-30987654-3', telefono: '0241-5550202', ciudad: 'Valencia', direccion: 'Calle 50, Zona Industrial', correo: 'pedidos@lafortuna.com', tipo_contribuyente: 'especial', moneda: 'USD', vendedor_id: 2, activo: true },
+  { id: 3, codigo: 'C-0003', nombre: 'Supermercado Doña Rosa', rif: 'J-29876543-1', telefono: '0212-5550303', ciudad: 'Caracas', direccion: 'Av. Sucre, Coche', correo: 'admin@donarosa.com', tipo_contribuyente: 'ordinario', moneda: 'USD', vendedor_id: 3, activo: true },
+  { id: 4, codigo: 'C-0004', nombre: 'Comercializadora Andes', rif: 'J-27654321-9', telefono: '0261-5550404', ciudad: 'Maracaibo', direccion: 'Av. 5 de Julio, Sector Norte', correo: 'compras@andes.com', tipo_contribuyente: 'especial', moneda: 'USD', vendedor_id: 3, activo: true },
+  { id: 5, codigo: 'C-0005', nombre: 'Tienda El Ahorro', rif: 'J-25432198-5', telefono: '0212-5550505', ciudad: 'Barquisimeto', direccion: 'Calle 20 con Av. Libertador', correo: 'el.ahorro@correo.com', tipo_contribuyente: 'ordinario', moneda: 'USD', vendedor_id: 2, activo: true },
+  { id: 6, codigo: 'C-0006', nombre: 'Mayorista El Triunfo', rif: 'J-21345678-2', telefono: '0414-5550606', ciudad: 'Maracay', direccion: 'Av. Bolívar, Choroní', correo: 'ventas@eltriunfo.com', tipo_contribuyente: 'ordinario', moneda: 'USD', vendedor_id: 3, activo: true }
 ];
 
 const productos = [
@@ -163,6 +163,31 @@ export const memoryStore = {
     );
   },
   getCustomer: async (id) => byId(clientes, id) || null,
+  findCustomerByRif: async (rif) =>
+    clientes.find(
+      (c) => String(c.rif).trim().toLowerCase() === String(rif).trim().toLowerCase()
+    ) || null,
+  createCustomer: async (data) => {
+    const id = clientes.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+    const vendedor = byId(usuarios, data.vendedor_id);
+    const cliente = {
+      id,
+      codigo: `C-${String(id).padStart(4, '0')}`,
+      nombre: data.nombre,
+      rif: data.rif,
+      telefono: data.telefono || '',
+      ciudad: data.ciudad || '',
+      direccion: data.direccion || '',
+      correo: data.correo || '',
+      tipo_contribuyente: data.tipo_contribuyente || 'ordinario',
+      moneda: data.moneda || 'USD',
+      vendedor_id: data.vendedor_id,
+      vendedor_nombre: vendedor?.nombre || '',
+      activo: data.estado !== 'inactivo'
+    };
+    clientes.push(cliente);
+    return cliente;
+  },
   customerPrices: async (clienteId) =>
     preciosClientes.filter((p) => p.cliente_id === Number(clienteId)),
   customerPrice: async (clienteId, productoId) => {

@@ -56,24 +56,69 @@ export default function ClienteSelector({ value, onChange, autoFocus = false }) 
   }, [value, items]);
 
   if (value && !open) {
+    const activo = seleccionado?.activo !== false;
     return (
-      <div className="cliente-selected" ref={boxRef}>
-        <div>
-          <strong>{seleccionado?.nombre || `Cliente #${value}`}</strong>
-          <span>
-            {seleccionado?.codigo} {seleccionado?.rif ? `· ${seleccionado.rif}` : ''}{' '}
-            {seleccionado?.ciudad ? `· ${seleccionado.ciudad}` : ''}
-          </span>
+      <div className="cliente-card" ref={boxRef}>
+        <div className="cliente-card-head">
+          <div>
+            <strong>{seleccionado?.nombre || `Cliente #${value}`}</strong>
+            <span>
+              {seleccionado?.codigo} {seleccionado?.rif ? `· ${seleccionado.rif}` : ''}{' '}
+              {seleccionado?.ciudad ? `· ${seleccionado.ciudad}` : ''}
+            </span>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              onChange(null);
+              setOpen(true);
+            }}
+          >
+            Cambiar
+          </button>
         </div>
-        <button
-          className="btn btn-ghost"
-          onClick={() => {
-            onChange(null);
-            setOpen(true);
-          }}
-        >
-          Cambiar
-        </button>
+
+        {seleccionado && (
+          <div className="kv cliente-kv">
+            <div>
+              <span>Estado</span>
+              <strong>
+                <span className={`tag ${activo ? 'tag-aprobado' : 'tag-rechazado'}`}>
+                  {activo ? 'Activo' : 'Inactivo'}
+                </span>
+              </strong>
+            </div>
+            <div>
+              <span>Tipo de contribuyente</span>
+              <strong className="capitalize">
+                {seleccionado.tipo_contribuyente || 'ordinario'}
+              </strong>
+            </div>
+            <div>
+              <span>RIF</span>
+              <strong>{seleccionado.rif || '—'}</strong>
+            </div>
+            <div>
+              <span>Teléfono</span>
+              <strong>{seleccionado.telefono || '—'}</strong>
+            </div>
+            <div>
+              <span>Dirección</span>
+              <strong>{seleccionado.direccion || '—'}</strong>
+            </div>
+            <div>
+              <span>Correo</span>
+              <strong>{seleccionado.correo || '—'}</strong>
+            </div>
+          </div>
+        )}
+
+        {!activo && (
+          <p className="hint hint-error">
+            Este cliente está inactivo en el A2. No se puede enviar un pedido hasta
+            activarlo.
+          </p>
+        )}
       </div>
     );
   }

@@ -108,11 +108,15 @@ const SQL_CLIENTES = `
          c.cli_vendedor as vendedor_codigo,
          coalesce(v.vnd_descripcion, u.usr_descripcion) as vendedor_nombre,
          coalesce(u.usr_idauto, 0) as vendedor_id,
+         coalesce(x.email, '') as correo,
+         coalesce(x.tipo_contribuyente, 'ordinario') as tipo_contribuyente,
+         coalesce(x.moneda, 'USD') as moneda,
          (c.cli_status is distinct from false) as activo
     from arc_clientes c
     left join arc_zonas z on z.zna_codigo = c.cli_zona
     left join arc_vendedores v on v.vnd_codigo = c.cli_vendedor
-    left join arc_users u on u.usr_codigo = c.cli_vendedor`;
+    left join arc_users u on u.usr_codigo = c.cli_vendedor
+    left join app_clientes_extra x on x.id_cliente = c.cli_id_auto`;
 
 const SQL_PEDIDOS = `
   select t.trn_id_auto as id,
@@ -284,6 +288,73 @@ export const arcStore = {
     if (rows[0]) return rows[0];
     const porCodigo = await q(`${SQL_CLIENTES} where c.cli_codigo = $1`, [id]);
     return porCodigo.rows[0] || null;
+  },
+  async findCustomerByRif(rif) {
+    const { rows } = await q(`${SQL_CLIENTES} where upper(c.cli_rif) = upper($1) limit 1`, [
+      String(rif).trim()
+    ]);
+    return rows[0] || null;
+  },
+  async createCustomer(data) {
+    const vendedor = await q(
+      'select usr_codigo from arc_users where usr_idauto = $1',
+      [data.vendedor_id]
+    );
+    const codigoVendedor = vendedor.rows[0]?.usr_codigo || null;
+
+    const c = await pool.connect();
+    try {
+      await c.query('begin');
+
+      const seq = await c.query(
+        `select coalesce(max((nullif(regexp_replace(cli_codigo, '\\D', '', 'g'), ''))::int), 0) + 1 as n
+           from arc_clientes`
+      );
+      const codigo = `C-${String(Number(seq.rows[0].n) || 1).padStart(4, '0')}`;
+
+      const insert = await c.query(
+        `insert into arc_clientes (
+           cli_codigo, cli_descripcion, cli_rif, cli_telefono, cli_direccion1,
+           cli_vendedor, cli_preciodefecto, cli_status, cli_systemdate
+         ) values ($1,$2,$3,$4,$5,$6,$7,$8, now())
+         returning cli_id_auto as id`,
+        [
+          codigo,
+          data.nombre,
+          data.rif,
+          data.telefono || null,
+          data.direccion || null,
+          codigoVendedor,
+          config.priceLevel,
+          data.estado !== 'inactivo'
+        ]
+      );
+      const id = Number(insert.rows[0].id);
+
+      await c.query(
+        `insert into app_clientes_extra (id_cliente, email, tipo_contribuyente, moneda)
+         values ($1,$2,$3,$4)
+         on conflict (id_cliente) do update
+            set email = excluded.email,
+                tipo_contribuyente = excluded.tipo_contribuyente,
+                moneda = excluded.moneda,
+                actualizado_en = now()`,
+        [
+          id,
+          data.correo || null,
+          data.tipo_contribuyente || 'ordinario',
+          data.moneda || 'USD'
+        ]
+      );
+
+      await c.query('commit');
+      return this.getCustomer(id);
+    } catch (err) {
+      await c.query('rollback');
+      throw err;
+    } finally {
+      c.release();
+    }
   },
   async nivelDelCliente(clienteId) {
     const { rows } = await q(
