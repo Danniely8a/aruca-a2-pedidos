@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import InstallApp from '../components/InstallApp.jsx';
 
 const money = (n, c = '$') => `${c}${Number(n || 0).toFixed(2)}`;
 
@@ -30,9 +31,12 @@ export default function Dashboard() {
           <h1>Hola, {user.nombre.split(' ')[0]}</h1>
           <p className="muted">Resumen de tu operación comercial</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/pedido')}>
-          Montar nuevo pedido
-        </button>
+        <div className="page-actions">
+          <InstallApp />
+          <button className="btn btn-primary" onClick={() => navigate('/pedido')}>
+            Montar nuevo pedido
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Logo from './Logo.jsx';
 import Footer from './Footer.jsx';
 import ServerStatus from './ServerStatus.jsx';
+import InstallApp from './InstallApp.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
@@ -66,6 +67,7 @@ export default function Layout() {
               <span>{user?.rol === 'admin' ? 'Administrador' : 'Vendedor'}</span>
             </div>
           </div>
+          <InstallApp />
           <button className="btn btn-ghost btn-block" onClick={cerrarSesion}>
             Cerrar sesión
           </button>
