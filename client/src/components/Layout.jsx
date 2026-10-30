@@ -19,6 +19,7 @@ export default function Layout() {
     { to: '/productos', label: 'Productos', icon: '▦' },
     { to: '/clientes', label: 'Clientes', icon: '☺' },
     { to: '/pedidos', label: 'Historial', icon: '≣' },
+    { to: '/reportes', label: 'Reportes', icon: '▥' },
     ...(user?.rol === 'admin'
       ? [{ to: '/configuracion', label: 'Configuración', icon: '⚙' }]
       : [])

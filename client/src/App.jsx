@@ -8,6 +8,7 @@ import Customers from './pages/Customers.jsx';
 import OrderBuilder from './pages/OrderBuilder.jsx';
 import OrderHistory from './pages/OrderHistory.jsx';
 import OrderDetail from './pages/OrderDetail.jsx';
+import Reports from './pages/Reports.jsx';
 import Settings from './pages/Settings.jsx';
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/pedido" element={<OrderBuilder />} />
         <Route path="/pedidos" element={<OrderHistory />} />
         <Route path="/pedidos/:id" element={<OrderDetail />} />
+        <Route path="/reportes" element={<Reports />} />
         <Route path="/configuracion" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

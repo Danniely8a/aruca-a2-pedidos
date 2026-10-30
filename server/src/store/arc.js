@@ -1,5 +1,6 @@
 import { pool } from '../db.js';
 import { config } from '../config.js';
+import { agruparSeries, aNumero } from './report-utils.js';
 
 const q = (text, params) => pool.query(text, params);
 
@@ -610,6 +611,181 @@ export const arcStore = {
       clientes: Number(clientes.rows[0].n),
       productos: Number(productos.rows[0].n),
       vendedores: Number(vendedores.rows[0].n)
+    };
+  },
+
+  async reportes({ desde, hasta, vendedorId = null } = {}) {
+    const { tipo } = await cfg();
+    const params = [tipo, desde, hasta];
+    const where = [
+      't.trn_tipo = $1',
+      't.trn_fechaemision >= $2',
+      't.trn_fechaemision <= $3'
+    ];
+
+    if (vendedorId) {
+      const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [
+        vendedorId
+      ]);
+      const codigo = u.rows[0]?.usr_codigo;
+      if (!codigo) {
+        return {
+          rango: { desde, hasta },
+          resumen: {
+            pedidos: 0,
+            items: 0,
+            subtotal: 0,
+            descuento: 0,
+            impuestos: 0,
+            total: 0,
+            promedio: 0
+          },
+          series: { dia: [], semana: [], mes: [] },
+          productos: [],
+          clientes: [],
+          estados: [],
+          vendedores: []
+        };
+      }
+      params.push(codigo);
+      where.push(`t.trn_vendedorasignado = $${params.length}`);
+    }
+
+    const filtro = where.join(' and ');
+    const serieParams = [...params, config.reportTimezone];
+    const zona = `$${serieParams.length}`;
+
+    const [resumenQ, serieQ, productosQ, clientesQ, estadosQ, vendedoresQ] =
+      await Promise.all([
+        q(
+          `select count(*) as pedidos,
+                  coalesce(sum(t.trn_totalbruto), 0) as subtotal,
+                  coalesce(sum(t.trn_descuento1monto), 0) as descuento,
+                  coalesce(sum(t.trn_impuesto1monto), 0) as impuestos,
+                  coalesce(sum(t.trn_totalneto), 0) as total
+             from arc_transacciones t
+            where ${filtro}`,
+          params
+        ),
+        q(
+          `select to_char((t.trn_fechaemision at time zone ${zona})::date, 'YYYY-MM-DD') as periodo,
+                  count(*) as pedidos,
+                  coalesce(sum(t.trn_totalneto), 0) as total,
+                  coalesce(sum(x.items), 0) as items
+             from arc_transacciones t
+             left join lateral (
+               select coalesce(sum(d.dtv_cantidad), 0) as items
+                 from arc_detalletranvtas d
+                where d.dtv_autoincrement = t.trn_autoincrement
+                  and d.dtv_documento = t.trn_documento
+             ) x on true
+            where ${filtro}
+            group by 1
+            order by 1`,
+          serieParams
+        ),
+        q(
+          `select d.dtv_codigo as codigo,
+                  coalesce(p.inv_descripcion, d.dtv_codigo) as descripcion,
+                  coalesce(sum(d.dtv_cantidad), 0) as cantidad,
+                  coalesce(sum(d.dtv_preciodeventa * d.dtv_cantidad *
+                    (1 - coalesce(d.dtv_porcentdescuento1, 0) / 100.0)), 0) as total,
+                  count(distinct t.trn_id_auto) as pedidos
+             from arc_detalletranvtas d
+             join arc_transacciones t
+               on t.trn_autoincrement = d.dtv_autoincrement
+              and t.trn_documento = d.dtv_documento
+             left join arc_inventario p on p.inv_codigo = d.dtv_codigo
+            where ${filtro}
+            group by d.dtv_codigo, p.inv_descripcion
+            order by total desc
+            limit 100`,
+          params
+        ),
+        q(
+          `select coalesce(c.cli_descripcion, t.trn_rifcliente) as cliente,
+                  t.trn_rifcliente as rif,
+                  count(*) as pedidos,
+                  coalesce(sum(t.trn_totalneto), 0) as total
+             from arc_transacciones t
+             left join arc_clientes c on c.cli_rif = t.trn_rifcliente
+            where ${filtro}
+            group by 1, 2
+            order by total desc
+            limit 100`,
+          params
+        ),
+        q(
+          `select t.trn_status as status,
+                  count(*) as pedidos,
+                  coalesce(sum(t.trn_totalneto), 0) as total
+             from arc_transacciones t
+            where ${filtro}
+            group by 1
+            order by 2 desc`,
+          params
+        ),
+        q(
+          `select coalesce(u.usr_descripcion, t.trn_vendedorasignado, 'Sin vendedor') as vendedor,
+                  count(*) as pedidos,
+                  coalesce(sum(t.trn_totalneto), 0) as total
+             from arc_transacciones t
+             left join arc_users u on u.usr_codigo = t.trn_vendedorasignado
+            where ${filtro}
+            group by 1
+            order by total desc`,
+          params
+        )
+      ]);
+
+    const filasDiarias = serieQ.rows.map((r) => ({
+      periodo: r.periodo,
+      pedidos: aNumero(r.pedidos),
+      items: aNumero(r.items),
+      total: aNumero(r.total)
+    }));
+    const series = agruparSeries(filasDiarias);
+    const items = filasDiarias.reduce((acc, f) => acc + f.items, 0);
+
+    const r = resumenQ.rows[0] || {};
+    const pedidos = aNumero(r.pedidos);
+    const total = round2(aNumero(r.total));
+
+    return {
+      rango: { desde, hasta },
+      resumen: {
+        pedidos,
+        items,
+        subtotal: round2(aNumero(r.subtotal)),
+        descuento: round2(aNumero(r.descuento)),
+        impuestos: round2(aNumero(r.impuestos)),
+        total,
+        promedio: pedidos ? round2(total / pedidos) : 0
+      },
+      series,
+      productos: productosQ.rows.map((x) => ({
+        codigo: x.codigo,
+        descripcion: x.descripcion,
+        cantidad: aNumero(x.cantidad),
+        total: round2(aNumero(x.total)),
+        pedidos: aNumero(x.pedidos)
+      })),
+      clientes: clientesQ.rows.map((x) => ({
+        cliente: x.cliente,
+        rif: x.rif,
+        pedidos: aNumero(x.pedidos),
+        total: round2(aNumero(x.total))
+      })),
+      estados: estadosQ.rows.map((x) => ({
+        estado: aEstado(x.status),
+        pedidos: aNumero(x.pedidos),
+        total: round2(aNumero(x.total))
+      })),
+      vendedores: vendedoresQ.rows.map((x) => ({
+        vendedor: x.vendedor,
+        pedidos: aNumero(x.pedidos),
+        total: round2(aNumero(x.total))
+      }))
     };
   },
 

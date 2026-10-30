@@ -16,6 +16,8 @@ export const config = {
     return v > 1 ? v / 100 : v;
   })(),
   currency: process.env.CURRENCY || '$',
+  // Zona horaria usada para agrupar los reportes por día/semana/mes
+  reportTimezone: process.env.REPORT_TIMEZONE || 'America/Caracas',
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   // Tipo de operación A2 que identifica los pedidos montados desde la web
   // (10 = "Pedidos" en arc_tipo_operacion; 1 es "Traslados")

@@ -265,6 +265,81 @@ async function main() {
       `=${cli1.data.precios?.length}`
     );
 
+    // --- Reportes --------------------------------------------------------
+    const maria = await req('/api/auth/login', {
+      method: 'POST',
+      body: { usuario: 'maria@empresa.com', password: 'vendedor123' }
+    });
+    check('login de María para reportes', maria.status === 200);
+    const pedidoMaria = await req('/api/pedidos', {
+      method: 'POST',
+      token: maria.data.token,
+      body: {
+        cliente_id: cli?.id,
+        items: [{ producto_id: p1?.id, cantidad: 1, descuento: 0, precio }]
+      }
+    });
+    check(
+      'pedido de otro vendedor para reportes → 201',
+      pedidoMaria.status === 201,
+      JSON.stringify(pedidoMaria.data)
+    );
+
+    const repDesde = encodeURIComponent(
+      new Date(Date.now() - 30 * 86400000).toISOString()
+    );
+    const repHasta = encodeURIComponent(
+      new Date(Date.now() + 86400000).toISOString()
+    );
+    const repAdmin = await req(`/api/reportes?desde=${repDesde}&hasta=${repHasta}`, {
+      token: tAdmin
+    });
+    check('reporte admin → 200', repAdmin.status === 200, JSON.stringify(repAdmin.data).slice(0, 120));
+    check(
+      'reporte con pedidos, items y total',
+      repAdmin.data?.resumen?.pedidos > 0 &&
+        repAdmin.data?.resumen?.items > 0 &&
+        repAdmin.data?.resumen?.total > 0,
+      JSON.stringify(repAdmin.data?.resumen)
+    );
+    check(
+      'reporte con series diaria, semanal y mensual',
+      (repAdmin.data?.series?.dia || []).length > 0 &&
+        (repAdmin.data?.series?.semana || []).length > 0 &&
+        (repAdmin.data?.series?.mes || []).length > 0
+    );
+    check(
+      'reporte por producto',
+      (repAdmin.data?.productos || []).length > 0,
+      `=${repAdmin.data?.productos?.length}`
+    );
+    check(
+      'reporte por cliente',
+      (repAdmin.data?.clientes || []).length > 0,
+      `=${repAdmin.data?.clientes?.length}`
+    );
+    check(
+      'reporte por estado y vendedor',
+      (repAdmin.data?.estados || []).length > 0 &&
+        (repAdmin.data?.vendedores || []).length > 0
+    );
+
+    const repVendedor = await req(
+      `/api/reportes?desde=${repDesde}&hasta=${repHasta}`,
+      { token: tCarlos }
+    );
+    check(
+      'vendedor ve menos pedidos que el admin',
+      repVendedor.status === 200 &&
+        repVendedor.data?.resumen?.pedidos < repAdmin.data?.resumen?.pedidos,
+      `vend=${repVendedor.data?.resumen?.pedidos} admin=${repAdmin.data?.resumen?.pedidos}`
+    );
+
+    const repInvalido = await req(`/api/reportes?desde=${repHasta}&hasta=${repDesde}`, {
+      token: tAdmin
+    });
+    check('reporte con rango invertido → 400', repInvalido.status === 400, `=${repInvalido.status}`);
+
     // --- Configuración (solo administradores) ---------------------------
     const sinTok = await req('/api/settings/empresa');
     check('configuración sin token → 401', sinTok.status === 401, `=${sinTok.status}`);

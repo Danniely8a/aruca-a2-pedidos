@@ -125,6 +125,7 @@ Los usuarios se guardan en `arc_users` y sus contraseñas (hash bcrypt) en la ta
 | GET | `/api/pedidos/:id` | Detalle con líneas del A2 |
 | PATCH | `/api/pedidos/:id/estado` | Cambia estado (solo admin) |
 | GET | `/api/dashboard` | KPIs del mes |
+| GET | `/api/reportes?desde=&hasta=` | Reportes por rango: resumen, series diaria/semanal/mensual, productos, clientes, estados y vendedores |
 | GET/PUT | `/api/settings/empresa` | Datos de `arc_company` (solo admin) |
 | GET/POST/PUT/DELETE | `/api/settings/correlativos` | CRUD de `arc_correlatives` (solo admin) |
 | GET/POST/PUT/DELETE | `/api/settings/tipos` | CRUD de `arc_tipo_operacion` (solo admin) |

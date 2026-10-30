@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
 import { round2, calcOrderTotals } from './totals.js';
+import { agruparSeries } from './report-utils.js';
 
 const hash = (pwd) => bcrypt.hashSync(pwd, 10);
 
@@ -293,6 +294,140 @@ export const memoryStore = {
       clientes: clientes.length,
       productos: productos.length,
       vendedores: usuarios.filter((u) => u.rol === 'vendedor').length
+    };
+  },
+
+  async reportes({ desde, hasta, vendedorId = null } = {}) {
+    const from = new Date(desde);
+    const to = new Date(hasta);
+    const fechaLocal = (fecha) => {
+      try {
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone: config.reportTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(new Date(fecha));
+      } catch {
+        return new Date(fecha).toISOString().slice(0, 10);
+      }
+    };
+
+    const lista = pedidos.filter((p) => {
+      const f = new Date(p.fecha);
+      return f >= from && f <= to && (!vendedorId || p.vendedor_id === Number(vendedorId));
+    });
+
+    const diario = new Map();
+    const porProducto = new Map();
+    const porCliente = new Map();
+    const porEstado = new Map();
+    const porVendedor = new Map();
+    let items = 0;
+    let subtotal = 0;
+    let descuento = 0;
+    let impuestos = 0;
+    let totalMonto = 0;
+
+    lista.forEach((p) => {
+      const periodo = fechaLocal(p.fecha);
+      const detalles = p.detalles || [];
+      const cantidades = detalles.reduce((a, d) => a + Number(d.cantidad || 0), 0);
+      const monto = Number(p.total || 0);
+
+      items += cantidades;
+      subtotal = round2(subtotal + Number(p.subtotal || 0));
+      descuento = round2(descuento + Number(p.descuento || 0));
+      impuestos = round2(impuestos + Number(p.impuestos || 0));
+      totalMonto = round2(totalMonto + monto);
+
+      const dia = diario.get(periodo) || {
+        periodo,
+        pedidos: 0,
+        items: 0,
+        total: 0
+      };
+      dia.pedidos += 1;
+      dia.items += cantidades;
+      dia.total = round2(dia.total + monto);
+      diario.set(periodo, dia);
+
+      detalles.forEach((d) => {
+        const prod = byId(productos, d.producto_id);
+        const codigo = prod?.codigo || `#${d.producto_id}`;
+        const fila = porProducto.get(codigo) || {
+          codigo,
+          descripcion: prod?.descripcion || `Producto ${d.producto_id}`,
+          cantidad: 0,
+          total: 0,
+          pedidos: new Set()
+        };
+        const cantidad = Number(d.cantidad || 0);
+        const precio = Number(d.precio || 0);
+        const pct = Number(d.descuento || 0);
+        fila.cantidad += cantidad;
+        fila.total = round2(fila.total + precio * cantidad * (1 - pct / 100));
+        fila.pedidos.add(p.id);
+        porProducto.set(codigo, fila);
+      });
+
+      const cliente = byId(clientes, p.cliente_id);
+      const claveCliente = String(p.cliente_id);
+      const filaCliente = porCliente.get(claveCliente) || {
+        cliente: cliente?.nombre || `Cliente ${p.cliente_id}`,
+        rif: cliente?.rif || '',
+        pedidos: 0,
+        total: 0
+      };
+      filaCliente.pedidos += 1;
+      filaCliente.total = round2(filaCliente.total + monto);
+      porCliente.set(claveCliente, filaCliente);
+
+      const filaEstado = porEstado.get(p.estado) || {
+        estado: p.estado,
+        pedidos: 0,
+        total: 0
+      };
+      filaEstado.pedidos += 1;
+      filaEstado.total = round2(filaEstado.total + monto);
+      porEstado.set(p.estado, filaEstado);
+
+      const vendedor = byId(usuarios, p.vendedor_id);
+      const nombreVendedor = vendedor?.nombre || 'Sin vendedor';
+      const filaVendedor = porVendedor.get(nombreVendedor) || {
+        vendedor: nombreVendedor,
+        pedidos: 0,
+        total: 0
+      };
+      filaVendedor.pedidos += 1;
+      filaVendedor.total = round2(filaVendedor.total + monto);
+      porVendedor.set(nombreVendedor, filaVendedor);
+    });
+
+    const ordenar = (mapa, campo) =>
+      [...mapa.values()]
+        .sort((a, b) => b[campo] - a[campo])
+        .slice(0, 100);
+
+    return {
+      rango: { desde, hasta },
+      resumen: {
+        pedidos: lista.length,
+        items,
+        subtotal,
+        descuento,
+        impuestos,
+        total: totalMonto,
+        promedio: lista.length ? round2(totalMonto / lista.length) : 0
+      },
+      series: agruparSeries([...diario.values()]),
+      productos: ordenar(porProducto, 'total').map((x) => ({
+        ...x,
+        pedidos: x.pedidos.size
+      })),
+      clientes: ordenar(porCliente, 'total'),
+      estados: ordenar(porEstado, 'pedidos'),
+      vendedores: ordenar(porVendedor, 'total')
     };
   },
 
