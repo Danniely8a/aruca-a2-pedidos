@@ -4,12 +4,55 @@ import { agruparSeries, aNumero } from './report-utils.js';
 
 const q = (text, params) => pool.query(text, params);
 
-const ESTADOS = ['borrador', 'enviado', 'aprobado', 'facturado', 'rechazado'];
-const aEstado = (n) => ESTADOS[Number(n)] ?? 'enviado';
-const aCodigo = (e) => Math.max(0, ESTADOS.indexOf(e));
+// El A2 usa códigos 1..5 (no 0..4). El pedido que crea la web queda en 4
+// (enviado), tal como indica el mapeo de transacciones.
+const ESTADOS = [
+  { codigo: 1, nombre: 'borrador' },
+  { codigo: 2, nombre: 'aprobado' },
+  { codigo: 3, nombre: 'facturado' },
+  { codigo: 4, nombre: 'enviado' },
+  { codigo: 5, nombre: 'rechazado' }
+];
+const aEstado = (n) => ESTADOS.find((e) => e.codigo === Number(n))?.nombre ?? 'enviado';
+const aCodigo = (nombre) => ESTADOS.find((e) => e.nombre === nombre)?.codigo ?? 4;
 
 const pad = (n) => String(n).padStart(6, '0');
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const round4 = (n) => Math.round((Number(n) + Number.EPSILON) * 10000) / 10000;
+
+const normalizar = (s) =>
+  String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
+
+// El A2 identifica al vendedor por arc_vendedores.vnd_codigo. No hay una
+// relación directa con arc_users, así que se empareja por nombre.
+async function codigoVendedorPorUsuario(userId) {
+  const [usuario, vendedores] = await Promise.all([
+    q('select usr_codigo, usr_descripcion from arc_users where usr_idauto = $1', [userId]),
+    q('select vnd_codigo, vnd_descripcion from arc_vendedores')
+  ]);
+  const u = usuario.rows[0];
+  if (!u) return null;
+  const match = vendedores.rows.find(
+    (v) => normalizar(v.vnd_descripcion) === normalizar(u.usr_descripcion)
+  );
+  return match?.vnd_codigo || null;
+}
+
+async function factorDolar() {
+  const { rows } = await q(
+    `select mda_factoractivo
+       from arc_currencies
+      where mda_codigo = $1 or mda_iso4217 = 'USD'
+      order by (mda_iso4217 = 'USD') desc
+      limit 1`,
+    [String(config.currencyCode).padStart(2, '0')]
+  );
+  return rows[0] ? Number(rows[0].mda_factoractivo) : 1;
+}
 
 const nivelValido = (n) => {
   const v = Number(n);
@@ -82,6 +125,13 @@ const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
          i.inv_categoria as categoria_codigo,
          coalesce(nullif(i.inv_unidad, ''), 'unidad') as unidad,
          pr.__PRECIO__ as precio,
+         pr.icp_costoactbolivares as costo_bolivares,
+         pr.icp_costoactextranjero as costo_extranjero,
+         i.inv_descripciondetallada as descripcion_detallada,
+         i.inv_existdecimal as exist_decimal,
+         i.inv_seriales as usa_seriales,
+         i.inv_depositos as usa_depositos,
+         i.inv_capacidad as capacidad,
          coalesce(x.existencia, 0) as existencia,
          (i.inv_status is distinct from false) as activo
     from arc_inventario i
@@ -101,9 +151,15 @@ const SQL_CLIENTES = `
          c.cli_codigo as codigo,
          c.cli_descripcion as nombre,
          c.cli_rif as rif,
+         c.cli_nit as nit,
          c.cli_telefono as telefono,
          c.cli_direccion1 as direccion,
          c.cli_zona as zona_codigo,
+         c.cli_cobrador as cobrador_codigo,
+         c.cli_diascredito as dias_credito,
+         c.cli_moneda as moneda_codigo,
+         c.cli_exento as exento,
+         c.cli_especial as especial,
          z.zna_descripcion as ciudad,
          c.cli_preciodefecto as lista_precio,
          c.cli_vendedor as vendedor_codigo,
@@ -207,6 +263,7 @@ export const arcStore = {
   async findUserById(id) {
     const { rows } = await q(
       `select usr_idauto as id, usr_descripcion as nombre,
+              usr_codigo as codigo,
               coalesce(usr_login, usr_emailusuario) as usuario,
               usr_rol as rol, (usr_status is distinct from false) as activo
          from arc_users where usr_idauto = $1`,
@@ -218,6 +275,7 @@ export const arcStore = {
       id: Number(u.id),
       nombre: u.nombre || u.usuario,
       usuario: u.usuario,
+      codigo: u.codigo,
       rol: /admin/i.test(u.rol || '') ? 'admin' : 'vendedor',
       activo: u.activo
     };
@@ -312,11 +370,7 @@ export const arcStore = {
     return rows[0] || null;
   },
   async createCustomer(data) {
-    const vendedor = await q(
-      'select usr_codigo from arc_users where usr_idauto = $1',
-      [data.vendedor_id]
-    );
-    const codigoVendedor = vendedor.rows[0]?.usr_codigo || null;
+    const codigoVendedor = await codigoVendedorPorUsuario(data.vendedor_id);
 
     const c = await pool.connect();
     try {
@@ -407,11 +461,66 @@ export const arcStore = {
     const cliente = await this.getCustomer(data.cliente_id);
     if (!cliente) throw new Error('Cliente no encontrado en el A2');
 
-    const vendedor = await q(
-      'select usr_codigo from arc_users where usr_idauto = $1',
-      [data.vendedor_id]
+    const usuario = await this.getUserById(data.vendedor_id);
+    const codigoVendedor = await codigoVendedorPorUsuario(data.vendedor_id);
+    const usuarioCodigo = usuario?.codigo || usuario?.usuario || 'WEB';
+    const factor = await factorDolar();
+    const moneda = config.currencyCode;
+    const deposito = config.depositSource;
+    const maquina = config.machine;
+    const serie = config.serie;
+
+    const estadoNombre = data.estado || 'enviado';
+    const status = aCodigo(estadoNombre);
+    const listaUsada = Number(data.lista) || Number(cliente.lista_precio) || 0;
+    const tipoPrecio = listaUsada === 2 ? 2 : listaUsada === 4 ? 3 : 0;
+
+    const ahora = new Date();
+    const hora = ahora.toTimeString().slice(0, 8);
+    const diasCredito = Number(cliente.dias_credito) || 0;
+    const vencimiento = new Date(ahora);
+    vencimiento.setDate(vencimiento.getDate() + diasCredito);
+    const fechaVencido = `${vencimiento.getFullYear()}-${String(
+      vencimiento.getMonth() + 1
+    ).padStart(2, '0')}-${String(vencimiento.getDate()).padStart(2, '0')}`;
+
+    const lineas = [];
+    for (const d of data.detalles) {
+      const producto = await this.getProduct(d.producto_id, data.lista);
+      const cantidad = Number(d.cantidad) || 0;
+      const precio = Number(d.precio) || 0;
+      const pctDesc = Math.min(100, Math.max(0, Number(d.descuento) || 0));
+      const baseUnit = round4(precio * (1 - pctDesc / 100));
+      const impuestoUnit = round4(baseUnit * config.taxRate);
+      const precioVentaUnit = round4(baseUnit + impuestoUnit);
+      const costoLocal = Number(producto?.costo_bolivares) || 0;
+      const costoExt = Number(producto?.costo_extranjero) || 0;
+      const costoOperacion =
+        costoLocal > 0 && factor > 0 ? round4(costoLocal / factor) : round4(costoExt);
+      lineas.push({
+        d,
+        producto,
+        cantidad,
+        precio,
+        pctDesc,
+        baseUnit,
+        impuestoUnit,
+        precioVentaUnit,
+        costoLocal,
+        costoExt,
+        costoOperacion
+      });
+    }
+
+    const totalCostoReal = round4(
+      lineas.reduce((acc, l) => acc + l.costoOperacion * l.cantidad, 0)
     );
-    const codigoVendedor = vendedor.rows[0]?.usr_codigo || null;
+    const totalCostoExt = round2(
+      lineas.reduce((acc, l) => acc + l.costoExt * l.cantidad, 0)
+    );
+    const totalCostoNacional = round2(
+      lineas.reduce((acc, l) => acc + l.costoLocal * l.cantidad, 0)
+    );
 
     const c = await pool.connect();
     try {
@@ -423,71 +532,283 @@ export const arcStore = {
         'select coalesce(max(trn_autoincrement), 0) + 1 as n from arc_transacciones'
       );
       const autoincrement = Number(auto.rows[0].n);
+
+      const seqDetalle = await c.query(
+        'select coalesce(max(dtv_autoincrement), 0) + 1 as n from arc_detalletranvtas'
+      );
+      const primerDetalle = Number(seqDetalle.rows[0].n);
+
       const tipo = configuracion.tipo;
       const base = round2(Number(data.subtotal) - Number(data.descuento));
+      const impuestoPorcent = round2(config.taxRate * 100);
+      const cantidadItems = lineas.length;
 
+      const cabecera = {
+        trn_autoincrement: autoincrement,
+        trn_documento: numero,
+        trn_tipo: tipo,
+        trn_status: status,
+        trn_visible: true,
+        trn_fechaemision: ahora,
+        trn_depositosource: deposito,
+        trn_depositodestino: null,
+        trn_totalitems: cantidadItems,
+        trn_totalitemsinicial: cantidadItems,
+        trn_moneda: moneda,
+        trn_factorcambio: factor,
+        trn_totalcosto: round2(data.subtotal),
+        trn_totalcostoreal: totalCostoReal,
+        trn_clasificacion: 0,
+        trn_descripclasify: null,
+        trn_user: Number(data.vendedor_id) || null,
+        trn_autorizadopor: 'Crédito',
+        trn_proposito: null,
+        trn_responsable: cliente.codigo,
+        trn_detalle: data.observacion || null,
+        trn_tienelotes: false,
+        trn_updateitems: true,
+        trn_totalbruto: round2(data.subtotal),
+        trn_descuento1porcent: 0,
+        trn_descuento1monto: round2(data.descuento),
+        trn_descuento1origen: 1,
+        trn_descuento2porcent: 0,
+        trn_descuento2monto: 0,
+        trn_descuento2origen: 1,
+        trn_descuentoparcial: 0,
+        trn_fleteporcent: 0,
+        trn_fletemoneda: 0,
+        trn_fleteorigen: 1,
+        trn_baseimponible: base,
+        trn_baseimponible2: 0,
+        trn_impuesto1porcent: impuestoPorcent,
+        trn_impuesto1monto: round2(data.impuestos),
+        trn_impuesto2porcent: 0,
+        trn_impuesto2monto: 0,
+        trn_descuentocuadre: 0,
+        trn_totalneto: round2(data.total),
+        trn_fechavencido: fechaVencido,
+        trn_diasvencimiento: diasCredito,
+        trn_rifcliente: cliente.rif || null,
+        trn_nitcliente: cliente.nit || null,
+        trn_personacontacto: cliente.nombre || null,
+        trn_telefonocontacto: cliente.telefono || null,
+        trn_direcciondespacho: cliente.direccion || null,
+        trn_detallecomentario: null,
+        trn_ordencompra: null,
+        trn_existeplanillaimportacion: false,
+        trn_porcentfletesinasignar: 0,
+        trn_monedapago: config.paymentCurrency,
+        trn_totalprecio: base,
+        trn_vuelto: 0,
+        trn_autorizados: null,
+        trn_excento: Boolean(cliente.exento),
+        trn_costodeventa: totalCostoReal,
+        trn_tipooperacionorigen: 0,
+        trn_documentoorigen: null,
+        trn_fromcompuestos: false,
+        trn_vendedorasignado: codigoVendedor,
+        trn_zonaventa: cliente.zona_codigo || null,
+        trn_pendingforprint: null,
+        trn_cobradorasignado: cliente.cobrador_codigo || null,
+        trn_comisioncobros: 0,
+        trn_comisioncobrosbloqueada: false,
+        trn_facturasloterandom: null,
+        trn_multiplevendedor: false,
+        trn_multipledeposito: false,
+        trn_timesaved: null,
+        trn_tipoprecio: tipoPrecio,
+        trn_base_autoincrement: autoincrement,
+        trn_serie: serie,
+        trn_nameformato: null,
+        trn_machinename: maquina,
+        trn_comisionventa: 0,
+        trn_montopagado: 0,
+        trn_montoperiodo: 0,
+        trn_porcentperiodo: 0,
+        trn_hora: hora,
+        trn_guiadespacho: null,
+        trn_norecibocaja: null,
+        trn_ctocosto: null,
+        trn_costoactualnacional: totalCostoNacional,
+        trn_costoactualex: totalCostoExt,
+        trn_prefixinventario: null,
+        trn_numerocontrol: null,
+        trn_costoajustado: 0,
+        trn_factorreferencia: factor,
+        trn_finicial: 0,
+        trn_fintereses: 0,
+        trn_finteresesp: 0,
+        trn_fmanejo: 0,
+        trn_fmanejop: 0,
+        trn_fextraordinaria: 0,
+        trn_fctdextraordinaria: 0,
+        trn_fintextraordinaria: 0,
+        trn_fmtocuota: 0,
+        trn_fctdcuota: 0,
+        trn_fcobranza: 0,
+        trn_totalfinanciado: 0,
+        trn_saldofinanciar: 0,
+        trn_capitalcuotaextra: 0,
+        trn_credicard: null,
+        trn_maquinafiscal: null,
+        trn_totalpaginas: 0,
+        trn_sucursalorigen: 0,
+        trn_fechalibro: ahora,
+        trn_ivaintereses: 0,
+        trn_reimpresafiscal: false,
+        trn_dctofiscalorigen: null,
+        trn_fechafactura: '1899-12-30',
+        trn_dctoiva: 0,
+        trn_monedacambio: null,
+        trn_tipofactorcambio: 0,
+        trn_origencambio: 0,
+        trn_factorvuelto: 0,
+        trn_codecambio: null,
+        trn_vueltoorg: 0,
+        trn_vtanapago: 0,
+        trn_factorreferencia2: 0,
+        trn_extrafield01: null,
+        trn_extrafield02: null,
+        trn_extrafield03: null,
+        trn_extrafield04: null,
+        trn_extrafield05: null,
+        trn_baseigtf: 0,
+        trn_extrafield06: null,
+        trn_imprentaasignacion: null,
+        trn_imprentahora: null,
+        trn_statusimprenta: 0,
+        trn_imprentadocorigen: null,
+        trn_imprentamotivo: null,
+        trn_imprentafechaorigen: '1899-12-30',
+        trn_imprentaserieorigen: null,
+        trn_imprentamtoorigen: 0,
+        trn_mtootroscargos: 0,
+        trn_imprentacorrelativo: 0,
+        trn_imprentacontrolorigen: null,
+        trn_systemdate: ahora,
+        trn_namemachine: maquina,
+        trn_usercreator: usuarioCodigo,
+        trn_lastupdatedate: ahora,
+        trn_lastmachine: maquina,
+        trn_userlastupdate: usuarioCodigo,
+        trn_sync_status: false
+      };
+
+      const columnas = Object.keys(cabecera);
+      const valores = Object.values(cabecera);
+      const marcas = columnas.map((_, i) => `$${i + 1}`);
       const insertTrn = await c.query(
-        `insert into arc_transacciones (
-           trn_autoincrement, trn_documento, trn_tipo, trn_status,
-           trn_fechaemision, trn_rifcliente, trn_vendedorasignado, trn_totalitems,
-           trn_totalbruto, trn_descuento1monto, trn_baseimponible,
-           trn_impuesto1porcent, trn_impuesto1monto, trn_totalneto, trn_totalprecio,
-           trn_detalle, trn_usercreator, trn_namemachine, trn_systemdate
-         ) values ($1,$2,$3,$4, now(), $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14, $15, 'A2-WEB', now())
+        `insert into arc_transacciones (${columnas.join(', ')})
+         values (${marcas.join(', ')})
          returning trn_id_auto`,
-        [
-          autoincrement,
-          numero,
-          tipo,
-          aCodigo(data.estado || 'enviado'),
-          cliente.rif || null,
-          codigoVendedor,
-          data.detalles.length,
-          data.subtotal,
-          data.descuento,
-          base,
-          round2(config.taxRate * 100),
-          data.impuestos,
-          data.total,
-          data.observacion || null,
-          String(data.vendedor_codigo || 'sistema')
-        ]
+        valores
       );
       const idTrn = Number(insertTrn.rows[0].trn_id_auto);
 
-      let linea = 0;
-      for (const d of data.detalles) {
-        linea += 1;
-        const cantidad = Number(d.cantidad) || 0;
-        const precio = Number(d.precio) || 0;
-        const pctDesc = Number(d.descuento) || 0;
-        const bruto = round2(precio * cantidad);
-        const montoDesc = round2((bruto * pctDesc) / 100);
-        const netoLinea = round2(bruto - montoDesc);
+      for (let i = 0; i < lineas.length; i += 1) {
+        const l = lineas[i];
+        const dtvAutoincrement = primerDetalle + i;
+        const detalle = {
+          dtv_tipooperacion: tipo,
+          dtv_codigo: l.d.codigo,
+          dtv_linea: i,
+          dtv_documento: numero,
+          dtv_autoincrement: dtvAutoincrement,
+          dtv_clienteproveedor: cliente.codigo,
+          dtv_documentoorigen: null,
+          dtv_lineaorigen: null,
+          dtv_clasificacion: 0,
+          dtv_status: status,
+          dtv_visible: true,
+          dtv_costo: l.costoOperacion,
+          dtv_cantidad: l.cantidad,
+          dtv_cantidadpendiente: l.cantidad,
+          dtv_lote: null,
+          dtv_loterandom: 0,
+          dtv_newlote: false,
+          dtv_depositosource: deposito,
+          dtv_depositotarget: null,
+          dtv_operacion_autoincrement: autoincrement,
+          dtv_decimales: Boolean(l.producto?.exist_decimal),
+          dtv_decimalespen: Boolean(l.producto?.exist_decimal),
+          dtv_serialnumber: Math.floor(Math.random() * 2000000000) + 1,
+          dtv_usaseriales: Boolean(l.producto?.usa_seriales),
+          dtv_usadepositos: Boolean(l.producto?.usa_depositos),
+          dtv_costooperacion: l.costoOperacion,
+          dtv_memodetalle: l.producto?.descripcion_detallada || null,
+          dtv_moneda: moneda,
+          dtv_factorcambio: factor,
+          dtv_existedetalleimportacion: false,
+          dtv_existedetalledecostos: false,
+          dtv_alicuotafleteotros: 0,
+          dtv_impuesto1: impuestoPorcent,
+          dtv_porcentimpuesto1: true,
+          dtv_montoimpuesto1: l.impuestoUnit,
+          dtv_impuesto2: 0,
+          dtv_porcentimpuesto2: false,
+          dtv_montoimpuesto2: 0,
+          dtv_origenprice: 3,
+          dtv_porcentdescparcial: 0,
+          dtv_descuentoparcial: 0,
+          dtv_preciosindescuento: l.precio,
+          dtv_preciocondescuento: l.baseUnit,
+          dtv_preciodeventa: l.precioVentaUnit,
+          dtv_rounddesctparcial: 0,
+          dtv_comisionfija: 0,
+          dtv_comisionfijap: true,
+          dtv_unddescarga: Number(l.producto?.capacidad) || 1,
+          dtv_undcapacidad: Number(l.producto?.capacidad) || 1,
+          dtv_unddetallada: Boolean(l.producto?.exist_decimal),
+          dtv_indexprices: 0,
+          dtv_partesusanseriales: false,
+          dtv_costodeventas: l.costoOperacion,
+          dtv_descripcionoferta: null,
+          dtv_vendedorasignado: codigoVendedor,
+          dtv_montocomision: 0,
+          dtv_preciobasecomision: l.baseUnit,
+          dtv_comisionbloqueada: false,
+          dtv_comisionyapagada: false,
+          dtv_documentoliberacion: null,
+          dtv_tipodecomision: 0,
+          dtv_priceforcomision: 1,
+          dtv_fechaoperacion: ahora,
+          dtv_user: Number(data.vendedor_id) || null,
+          dtv_porcentdescuento1: l.pctDesc,
+          dtv_porcentdescuento2: 0,
+          dtv_costosupdate: false,
+          dtv_base_autoincrement: dtvAutoincrement,
+          dtv_totalpeso: 0,
+          dtv_ctocosto: 0,
+          dtv_autorizado: null,
+          dtv_markperiodo: false,
+          dtv_ctocostostr: null,
+          dtv_costoactualnacional: l.costoLocal,
+          dtv_costoactualext: l.costoExt,
+          dtv_prefixinventario: null,
+          dtv_costoajustado: 0,
+          dtv_fechalibro: '1899-12-30',
+          dtv_montoliquidado: 0,
+          dtv_tipodocumentoorigen: 0,
+          dtv_statusdocumentoorigen: 0,
+          dtv_dctoiva: 0,
+          dtv_montoimpuesto1dcto: 0,
+          dtv_preciodeventadcto: 0,
+          dtv_systemdate: ahora,
+          dtv_namemachine: maquina,
+          dtv_usercreator: usuarioCodigo,
+          dtv_lastupdatedate: ahora,
+          dtv_lastmachine: maquina,
+          dtv_userlastupdate: usuarioCodigo,
+          dtv_sync_status: false
+        };
+
+        const dcols = Object.keys(detalle);
+        const dvals = Object.values(detalle);
+        const dmarcas = dcols.map((_, idx) => `$${idx + 1}`);
         await c.query(
-          `insert into arc_detalletranvtas (
-             dtv_tipooperacion, dtv_codigo, dtv_linea, dtv_documento,
-             dtv_autoincrement, dtv_clienteproveedor, dtv_cantidad, dtv_preciodeventa,
-             dtv_preciosindescuento, dtv_preciocondescuento, dtv_porcentdescuento1,
-             dtv_descuentoparcial, dtv_impuesto1, dtv_montoimpuesto1, dtv_fechaoperacion,
-             dtv_usercreator, dtv_namemachine, dtv_systemdate
-           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13, current_date, $14, 'A2-WEB', now())`,
-          [
-            tipo,
-            d.codigo,
-            linea,
-            numero,
-            autoincrement,
-            cliente.codigo,
-            cantidad,
-            precio,
-            cantidad > 0 ? round2(netoLinea / cantidad) : precio,
-            pctDesc,
-            montoDesc,
-            config.taxRate,
-            round2(netoLinea * config.taxRate),
-            String(data.vendedor_codigo || 'sistema')
-          ]
+          `insert into arc_detalletranvtas (${dcols.join(', ')})
+           values (${dmarcas.join(', ')})`,
+          dvals
         );
       }
 
@@ -495,8 +816,8 @@ export const arcStore = {
       return {
         id: idTrn,
         numero,
-        fecha: new Date().toISOString(),
-        estado: data.estado || 'enviado',
+        fecha: ahora.toISOString(),
+        estado: aEstado(status),
         total: data.total
       };
     } catch (err) {
@@ -508,11 +829,24 @@ export const arcStore = {
   },
 
   async updateOrderEstado(id, estado) {
-    const { rows } = await q(
-      'update arc_transacciones set trn_status = $1, trn_lastupdatedate = now() where trn_id_auto = $2 returning trn_id_auto',
-      [aCodigo(estado), id]
+    const codigo = aCodigo(estado);
+    const cabecera = await q(
+      'select trn_autoincrement, trn_documento from arc_transacciones where trn_id_auto = $1',
+      [id]
     );
-    if (!rows[0]) return null;
+    if (!cabecera.rows[0]) return null;
+
+    await q(
+      'update arc_transacciones set trn_status = $1, trn_lastupdatedate = now() where trn_id_auto = $2',
+      [codigo, id]
+    );
+    await q(
+      `update arc_detalletranvtas
+          set dtv_status = $1, dtv_lastupdatedate = now()
+        where dtv_operacion_autoincrement = $2 and dtv_documento = $3`,
+      [codigo, cabecera.rows[0].trn_autoincrement, cabecera.rows[0].trn_documento]
+    );
+
     const { rows: p } = await q(`${SQL_PEDIDOS} where t.trn_id_auto = $1`, [id]);
     return p[0] ? mapearPedido(p[0]) : null;
   },
@@ -560,7 +894,7 @@ export const arcStore = {
               p.inv_descripcion as descripcion, p.inv_unidad as unidad, p.inv_codigo as codigo
          from arc_detalletranvtas d
          left join arc_inventario p on p.inv_codigo = d.dtv_codigo
-        where d.dtv_autoincrement = (select trn_autoincrement from arc_transacciones where trn_id_auto = $1)
+        where d.dtv_operacion_autoincrement = (select trn_autoincrement from arc_transacciones where trn_id_auto = $1)
           and d.dtv_documento = (select trn_documento from arc_transacciones where trn_id_auto = $1)
         order by d.dtv_linea`,
       [id]
@@ -789,5 +1123,5 @@ export const arcStore = {
     };
   },
 
-  estados: () => ESTADOS
+  estados: () => ESTADOS.map((e) => e.nombre)
 };

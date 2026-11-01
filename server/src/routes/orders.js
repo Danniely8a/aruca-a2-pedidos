@@ -87,6 +87,7 @@ router.post(
       cliente_id: cliente.id,
       vendedor_id: responsable,
       estado: 'enviado',
+      lista: listaSel,
       observacion: String(observacion || '').slice(0, 500),
       subtotal: totales.subtotal,
       descuento: totales.descuento,

@@ -18,6 +18,12 @@ export const config = {
   currency: process.env.CURRENCY || '$',
   // Zona horaria usada para agrupar los reportes por día/semana/mes
   reportTimezone: process.env.REPORT_TIMEZONE || 'America/Caracas',
+  // Valores por defecto del mapeo A2 para pedidos creados desde la web
+  depositSource: int(process.env.A2_DEPOSITO, 1),
+  currencyCode: int(process.env.A2_MONEDA, 2),
+  paymentCurrency: int(process.env.A2_MONEDA_PAGO, 2),
+  serie: process.env.A2_SERIE || 'WEB',
+  machine: process.env.A2_MAQUINA || 'WEB',
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   // Tipo de operación A2 que identifica los pedidos montados desde la web
   // (10 = "Pedidos" en arc_tipo_operacion; 1 es "Traslados")

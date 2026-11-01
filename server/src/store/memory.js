@@ -67,7 +67,7 @@ const preciosClientes = [
   { cliente_id: 3, producto_id: 6, precio: 6.5 }
 ];
 
-const estados = ['borrador', 'enviado', 'aprobado', 'facturado', 'rechazado'];
+const estados = ['borrador', 'aprobado', 'facturado', 'enviado', 'rechazado'];
 
 let pedidos = [
   {

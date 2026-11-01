@@ -532,6 +532,74 @@ async function main() {
       `=${pedidoLista.data?.totales?.subtotal} esperado=${esperadoLista2}`
     );
 
+    // --- Mapeo A2 de la cabecera y el detalle ---------------------------
+    const mapeo = await pool.query(
+      `select trn_autoincrement, trn_status, trn_moneda, trn_factorcambio,
+              trn_depositosource, trn_totalitemsinicial, trn_responsable,
+              trn_personacontacto, trn_telefonocontacto, trn_tipoprecio,
+              trn_serie, trn_machinename, trn_visible, trn_base_autoincrement
+         from a2_test.arc_transacciones
+        where trn_id_auto = $1`,
+      [pedidoLista.data.pedido.id]
+    );
+    const hm = mapeo.rows[0];
+    check(
+      'mapeo: moneda, depósito, serie y máquina',
+      Number(hm?.trn_moneda) === 2 &&
+        Number(hm?.trn_depositosource) === 1 &&
+        hm?.trn_serie === 'WEB' &&
+        hm?.trn_machinename === 'WEB',
+      JSON.stringify(hm)
+    );
+    check(
+      'mapeo: estado inicial 4 y tipo de precio 2',
+      Number(hm?.trn_status) === 4 && Number(hm?.trn_tipoprecio) === 2,
+      `status=${hm?.trn_status} tipo=${hm?.trn_tipoprecio}`
+    );
+    check(
+      'mapeo: items iniciales, responsable y contacto del cliente',
+      Number(hm?.trn_totalitemsinicial) === 1 &&
+        Boolean(hm?.trn_responsable) &&
+        Boolean(hm?.trn_personacontacto) &&
+        Boolean(hm?.trn_telefonocontacto),
+      JSON.stringify(hm)
+    );
+
+    const mapeoDetalle = await pool.query(
+      `select dtv_operacion_autoincrement, dtv_autoincrement, dtv_linea,
+              dtv_status, dtv_impuesto1, dtv_montoimpuesto1,
+              dtv_preciocondescuento, dtv_preciodeventa
+         from a2_test.arc_detalletranvtas
+        where dtv_operacion_autoincrement = $1 and dtv_documento = $2
+        order by dtv_linea`,
+      [hm?.trn_autoincrement, pedidoLista.data.pedido.numero]
+    );
+    const dm = mapeoDetalle.rows[0];
+    check(
+      'mapeo: detalle enlazado al encabezado con autoincrement propio',
+      Number(dm?.dtv_operacion_autoincrement) === Number(hm?.trn_autoincrement) &&
+        Number(dm?.dtv_autoincrement) !== Number(hm?.trn_autoincrement),
+      JSON.stringify(dm)
+    );
+    check(
+      'mapeo: línea 0, estado 4 e impuesto 16',
+      Number(dm?.dtv_linea) === 0 &&
+        Number(dm?.dtv_status) === 4 &&
+        Number(dm?.dtv_impuesto1) === 16,
+      JSON.stringify(dm)
+    );
+    check(
+      'mapeo: impuesto por unidad y precio de venta con impuesto',
+      Math.abs(
+        Number(dm?.dtv_montoimpuesto1) - Number(dm?.dtv_preciocondescuento) * 0.16
+      ) < 0.0002 &&
+        Math.abs(
+          Number(dm?.dtv_preciodeventa) -
+            (Number(dm?.dtv_preciocondescuento) + Number(dm?.dtv_montoimpuesto1))
+        ) < 0.0002,
+      JSON.stringify(dm)
+    );
+
     const detalleLista = await req(`/api/clientes/${cli2?.id}?lista=4`, {
       token: tAdmin
     });
