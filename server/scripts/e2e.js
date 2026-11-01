@@ -36,6 +36,7 @@ async function seed() {
     // search_path SOLO a2_test: así jamás se escriben las tablas públicas del A2
     await c.query('set search_path to a2_test');
     await c.query(fs.readFileSync(path.join(__dirname, '../sql/demo.sql'), 'utf8'));
+    await c.query(fs.readFileSync(path.join(__dirname, '../sql/triggers.sql'), 'utf8'));
     for (const [login, pwd] of CUENTAS) {
       const { rows } = await c.query(
         'select usr_idauto from arc_users where usr_login = $1',
@@ -169,8 +170,8 @@ async function main() {
         cliente_id: cli?.id,
         observacion: 'Pedido de prueba E2E',
         items: [
-          { producto_id: p1?.id, cantidad: 2, descuento: 0, precio },
-          { producto_id: p5?.id, cantidad: 1, descuento: 5, precio: Number(p5?.precio) || 80 }
+          { producto_id: p1?.id, cantidad: 2, precio },
+          { producto_id: p5?.id, cantidad: 1, precio: Number(p5?.precio) || 80 }
         ]
       }
     });
@@ -180,9 +181,9 @@ async function main() {
     // 2*12500 + 1350 (P-1005) con 5% de descuento en la segunda línea
     const t = creado.data?.totales || {};
     check('subtotal = 26350', Number(t.subtotal) === 26350, `=${t.subtotal}`);
-    check('descuento en MONTO = 67.50 (no el porcentaje)', Number(t.descuento) === 67.5, `=${t.descuento}`);
-    check('impuestos = base * 0.16', Number(t.impuestos) === 4205.2, `=${t.impuestos}`);
-    check('total = 30487.70', Number(t.total) === 30487.7, `=${t.total}`);
+    check('sin descuentos de línea', Number(t.descuento) === 0, `=${t.descuento}`);
+    check('impuestos = base * 0.16', Number(t.impuestos) === 4216, `=${t.impuestos}`);
+    check('total = 30566.00', Number(t.total) === 30566, `=${t.total}`);
 
     const historial = await req('/api/pedidos', { token: tCarlos });
     check('historial del vendedor = 1', historial.data.total === 1, `=${historial.data.total}`);
@@ -504,32 +505,31 @@ async function main() {
       (busquedaNuevo.data.items || []).some((x) => x.rif === 'J-99999999-1')
     );
 
-    // --- Selector de listas de precios (mayor = 2, mayor Bs = 4) --------
+    // --- Selector de listas de precios (mayor = lista 3, mayor Bs = 4) --
     const prodLista2 = await req('/api/productos?q=P-1001&lista=2', { token: tAdmin });
     const p1lista2 = prodLista2.data.items.find((x) => x.codigo === 'P-1001');
     const esperadoLista2 = Math.round(Number(p1.precio) * 0.92 * 100) / 100;
     check(
-      'catálogo con lista 2 devuelve el precio mayor',
+      'catálogo con lista 2 devuelve su precio',
       Number(p1lista2?.precio) === esperadoLista2,
       `=${p1lista2?.precio} esperado=${esperadoLista2}`
     );
 
+    const esperadoLista3 = Math.round(Number(p1.precio) * 0.90 * 100) / 100;
     const pedidoLista = await req('/api/pedidos', {
       method: 'POST',
       token: tCarlos,
       body: {
         cliente_id: cli?.id,
-        lista: 2,
-        items: [
-          { producto_id: p1?.id, cantidad: 1, descuento: 0, precio: Number(p1.precio) }
-        ]
+        lista: 3,
+        items: [{ producto_id: p1?.id, cantidad: 1, precio: Number(p1.precio) }]
       }
     });
     check(
-      'pedido con lista 2 usa el precio mayor',
+      'pedido con lista 3 usa el precio mayor',
       pedidoLista.status === 201 &&
-        Number(pedidoLista.data?.totales?.subtotal) === esperadoLista2,
-      `=${pedidoLista.data?.totales?.subtotal} esperado=${esperadoLista2}`
+        Number(pedidoLista.data?.totales?.subtotal) === esperadoLista3,
+      `=${pedidoLista.data?.totales?.subtotal} esperado=${esperadoLista3}`
     );
 
     // --- Mapeo A2 de la cabecera y el detalle ---------------------------
@@ -537,7 +537,8 @@ async function main() {
       `select trn_autoincrement, trn_status, trn_moneda, trn_factorcambio,
               trn_depositosource, trn_totalitemsinicial, trn_responsable,
               trn_personacontacto, trn_telefonocontacto, trn_tipoprecio,
-              trn_serie, trn_machinename, trn_visible, trn_base_autoincrement
+              trn_serie, trn_machinename, trn_visible, trn_base_autoincrement,
+              trn_sync_status
          from a2_test.arc_transacciones
         where trn_id_auto = $1`,
       [pedidoLista.data.pedido.id]
@@ -598,6 +599,25 @@ async function main() {
             (Number(dm?.dtv_preciocondescuento) + Number(dm?.dtv_montoimpuesto1))
         ) < 0.0002,
       JSON.stringify(dm)
+    );
+    check(
+      'mapeo: el pedido nace pendiente de sincronizar',
+      hm?.trn_sync_status === false,
+      `=${hm?.trn_sync_status}`
+    );
+
+    await pool.query(
+      'update a2_test.arc_transacciones set trn_sync_status = true where trn_id_auto = $1',
+      [pedidoLista.data.pedido.id]
+    );
+    const bloqueoSync = await req(
+      `/api/pedidos/${pedidoLista.data.pedido.id}/estado`,
+      { method: 'PATCH', token: tAdmin, body: { estado: 'aprobado' } }
+    );
+    check(
+      'pedido sincronizado no se puede modificar → 409',
+      bloqueoSync.status === 409,
+      `=${bloqueoSync.status}`
     );
 
     const detalleLista = await req(`/api/clientes/${cli2?.id}?lista=4`, {

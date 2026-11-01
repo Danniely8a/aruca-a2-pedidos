@@ -87,13 +87,18 @@ select v.inv_codigo, v.inv_descripcion, v.inv_categoria, 'unidad', true, now()
 ) as v(inv_codigo, inv_descripcion, inv_categoria)
 where not exists (select 1 from arc_inventario);
 
--- Listas de precios (6 niveles; se llena p01 y p02, el resto se deja nulo)
-insert into arc_inv_costos_precios (icp_codeitem, icp_p01preciosinimpuesto, icp_p01ipreciototal,
-                                    icp_p02preciosinimpuesto, icp_p02ipreciototal, icp_usercreator, icp_systemdate)
+-- Listas de precios (p01..p04 locales y extranjeras)
+insert into arc_inv_costos_precios (icp_codeitem,
+                                    icp_p01preciosinimpuesto, icp_p01ipreciototal,
+                                    icp_p02preciosinimpuesto, icp_p02ipreciototal,
+                                    icp_p01preciototalext, icp_p02preciototalext,
+                                    icp_p03preciototalext, icp_p04preciototalext,
+                                    icp_imp01monto, icp_usercreator, icp_systemdate)
 select p.inv_codigo,
        v.p1, round(v.p1 * 1.16, 2),
        v.p1 * 0.92, round(v.p1 * 0.92 * 1.16, 2),
-       'seed-demo', now()
+       v.p1, v.p1 * 0.92, v.p1 * 0.90, v.p1 * 0.85,
+       16, 'seed-demo', now()
   from arc_inventario p
   join (values
   ('P-1001', 12500.00), ('P-1002',  9800.00), ('P-1003', 21400.00), ('P-1004',  8700.00),

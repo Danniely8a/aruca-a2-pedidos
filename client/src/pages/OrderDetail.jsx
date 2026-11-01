@@ -64,7 +64,15 @@ export default function OrderDetail() {
             {d.toLocaleString('es-VE', { dateStyle: 'full', timeStyle: 'short' })}
           </p>
         </div>
-        <EstadoTag estado={pedido.estado} />
+        <div className="page-head-tags">
+          <EstadoTag estado={pedido.estado} />
+          {pedido.sync_status === false && (
+            <span className="tag tag-borrador">Pendiente por sincronizar</span>
+          )}
+          {pedido.sync_status === true && (
+            <span className="tag tag-aprobado">Sincronizado con el A2</span>
+          )}
+        </div>
       </div>
 
       <div className="grid-2">
@@ -176,7 +184,13 @@ export default function OrderDetail() {
 
       <ComprobantePedido pedido={pedido} empresa={empresa} currency={moneda} />
 
-      {user.rol === 'admin' && (
+      {user.rol === 'admin' && pedido.sync_status === true && (
+        <div className="alert alert-info">
+          Este pedido ya fue sincronizado con el A2. Solo se puede consultar.
+        </div>
+      )}
+
+      {user.rol === 'admin' && pedido.sync_status !== true && (
         <section className="card">
           <div className="card-head">
             <h2>Acciones de administrador</h2>

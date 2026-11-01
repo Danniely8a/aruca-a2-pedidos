@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import ClienteSelector from '../components/ClienteSelector.jsx';
 import ProductoBuscador from '../components/ProductoBuscador.jsx';
 
-const ETIQUETA_LISTA = { 2: 'Precio mayor', 4: 'Mayor Bs' };
+const ETIQUETA_LISTA = { 3: 'Precio mayor', 4: 'Mayor Bs' };
 
 const nuevoClienteVacio = {
   nombre: '',
@@ -71,7 +71,6 @@ export default function OrderBuilder() {
       .map((l) => ({
         producto_id: l.producto.id,
         cantidad: l.cantidad,
-        descuento: l.descuento || 0,
         precio: l.precio
       }));
     if (items.length === 0) {
@@ -267,8 +266,8 @@ export default function OrderBuilder() {
                 </button>
                 <button
                   type="button"
-                  className={`tab ${cart.lista === 2 ? 'active' : ''}`}
-                  onClick={() => cart.setLista(2)}
+                  className={`tab ${cart.lista === 3 ? 'active' : ''}`}
+                  onClick={() => cart.setLista(3)}
                 >
                   Precio mayor
                 </button>
@@ -305,7 +304,6 @@ export default function OrderBuilder() {
                       <th>Descripción</th>
                       <th className="center">Cantidad</th>
                       <th className="right">Precio</th>
-                      <th className="center">Desc. %</th>
                       <th className="right">Total</th>
                       <th></th>
                     </tr>
@@ -344,27 +342,11 @@ export default function OrderBuilder() {
                             }
                           />
                         </td>
-                        <td className="center">
-                          <input
-                            className="input input-num"
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={l.descuento}
-                            onChange={(e) => cart.setDescuento(l.producto.id, e.target.value)}
-                          />
-                        </td>
                         <td className="right">
                           <strong>
                             {cart.currency}
                             {l.subtotal.toFixed(2)}
                           </strong>
-                          {l.descuentoValor > 0 && (
-                            <div className="sub">
-                              -{cart.currency}
-                              {l.descuentoValor.toFixed(2)}
-                            </div>
-                          )}
                         </td>
                         <td className="right">
                           <button
@@ -425,19 +407,6 @@ export default function OrderBuilder() {
                             onChange={(e) => cart.setPrecio(l.producto.id, e.target.value)}
                           />
                         </label>
-                        <label>
-                          <span>Desc. %</span>
-                          <input
-                            className="input input-num"
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={l.descuento}
-                            onChange={(e) =>
-                              cart.setDescuento(l.producto.id, e.target.value)
-                            }
-                          />
-                        </label>
                       </div>
                       <div className="line-card-foot">
                         <span>Total</span>
@@ -487,13 +456,6 @@ export default function OrderBuilder() {
               <span>
                 {cart.currency}
                 {cart.subtotal.toFixed(2)}
-              </span>
-            </div>
-            <div className="total-row">
-              <span>Descuentos</span>
-              <span className="neg">
-                -{cart.currency}
-                {cart.descuento.toFixed(2)}
               </span>
             </div>
             <div className="total-row">

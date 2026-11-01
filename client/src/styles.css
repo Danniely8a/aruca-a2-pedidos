@@ -295,6 +295,17 @@ p {
   color: #991b1b;
   border: 1px solid #fecaca;
 }
+.alert-info {
+  background: #eef3ff;
+  color: #1d4ed8;
+  border: 1px solid #c7d7fe;
+}
+.page-head-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .toasts {
   position: fixed;
   right: 18px;
@@ -1601,7 +1612,7 @@ p {
   }
   .line-card-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
     margin-top: 12px;
   }

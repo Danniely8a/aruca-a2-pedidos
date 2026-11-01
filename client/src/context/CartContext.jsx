@@ -13,7 +13,12 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyCart;
     const parsed = JSON.parse(raw);
-    return { ...emptyCart, ...parsed, precios: parsed.precios || {} };
+    return {
+      ...emptyCart,
+      ...parsed,
+      precios: parsed.precios || {},
+      items: (parsed.items || []).map((item) => ({ ...item, descuento: 0 }))
+    };
   } catch {
     return emptyCart;
   }

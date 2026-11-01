@@ -12,6 +12,7 @@
     "seed:demo": "node scripts/seed-demo.js",
     "db:tablas": "node scripts/introspect.js",
     "db:test-schema": "node scripts/setup-test-schema.js",
+    "db:triggers": "node scripts/apply-triggers.js",
     "test:e2e": "node scripts/e2e.js"
   },
   "dependencies": {

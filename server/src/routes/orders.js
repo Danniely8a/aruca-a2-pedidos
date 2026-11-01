@@ -77,7 +77,7 @@ router.post(
         unidad: producto.unidad,
         cantidad,
         precio,
-        descuento: Math.min(100, Math.max(0, Number(raw.descuento) || 0))
+        descuento: 0
       });
     }
 
@@ -96,15 +96,19 @@ router.post(
       detalles: totales.lines
     });
 
+    // En PostgreSQL los totales oficiales los dejan los triggers; en modo
+    // demo se usan los calculados por Node.
+    const oficiales = {
+      subtotal: Number(pedido.subtotal ?? totales.subtotal),
+      descuento: Number(pedido.descuento ?? totales.descuento),
+      impuestos: Number(pedido.impuestos ?? totales.impuestos),
+      total: Number(pedido.total ?? totales.total),
+      tasa: config.taxRate
+    };
+
     res.status(201).json({
       pedido: { ...pedido, cliente },
-      totales: {
-        subtotal: totales.subtotal,
-        descuento: totales.descuento,
-        impuestos: totales.impuestos,
-        total: totales.total,
-        tasa: config.taxRate
-      }
+      totales: oficiales
     });
   })
 );
@@ -137,8 +141,15 @@ router.patch(
     if (!store.estados().includes(estado)) {
       throw new ApiError(400, 'Estado no válido');
     }
+    const actual = await store.getOrder(req.params.id);
+    if (!actual) throw new ApiError(404, 'Pedido no encontrado');
+    if (actual.sync_status === true) {
+      throw new ApiError(
+        409,
+        'El pedido ya fue sincronizado con el A2 y no se puede modificar'
+      );
+    }
     const pedido = await store.updateOrderEstado(req.params.id, estado);
-    if (!pedido) throw new ApiError(404, 'Pedido no encontrado');
     res.json({ pedido });
   })
 );

@@ -60,11 +60,15 @@ const nivelValido = (n) => {
   return Math.trunc(v);
 };
 
-// Columna de precio de arc_inv_costos_precios para una lista (1..6)
+// Columna de precio de arc_inv_costos_precios para una lista (1..6).
+// Los pedidos son en dólares (moneda 2), por lo que el A2 usa las columnas
+// ...preciototalext. Para bolívares se usan las columnas locales.
 const colPrecio = (nivel) => {
   const n = nivelValido(nivel) ?? config.priceLevel;
+  const prefijo = `icp_p${String(n).padStart(2, '0')}`;
+  if (config.currencyCode === 2) return `${prefijo}preciototalext`;
   const sufijo = config.priceWithTax ? 'ipreciototal' : 'preciosinimpuesto';
-  return `icp_p${String(n).padStart(2, '0')}${sufijo}`;
+  return `${prefijo}${sufijo}`;
 };
 
 // Configuración de la plataforma persistida en app_config (la edita el
@@ -187,6 +191,7 @@ const SQL_PEDIDOS = `
          t.trn_rifcliente as rif,
          t.trn_vendedorasignado as vendedor_codigo,
          t.trn_detalle as observacion,
+         t.trn_sync_status as sync_status,
          c.cli_id_auto as cliente_id,
          c.cli_codigo as cliente_codigo,
          c.cli_descripcion as cliente_nombre,
@@ -207,6 +212,7 @@ function mapearPedido(r) {
     impuestos: Number(r.impuestos || 0),
     total: Number(r.total || 0),
     observacion: r.observacion || '',
+    sync_status: r.sync_status,
     rif: r.rif,
     cliente: r.cliente_id
       ? {
@@ -472,8 +478,8 @@ export const arcStore = {
 
     const estadoNombre = data.estado || 'enviado';
     const status = aCodigo(estadoNombre);
-    const listaUsada = Number(data.lista) || Number(cliente.lista_precio) || 0;
-    const tipoPrecio = listaUsada === 2 ? 2 : listaUsada === 4 ? 3 : 0;
+    const listaUsada = Number(data.lista) || Number(cliente.lista_precio) || 1;
+    const tipoPrecio = Math.min(3, Math.max(0, listaUsada - 1));
 
     const ahora = new Date();
     const hora = ahora.toTimeString().slice(0, 8);
@@ -512,16 +518,6 @@ export const arcStore = {
       });
     }
 
-    const totalCostoReal = round4(
-      lineas.reduce((acc, l) => acc + l.costoOperacion * l.cantidad, 0)
-    );
-    const totalCostoExt = round2(
-      lineas.reduce((acc, l) => acc + l.costoExt * l.cantidad, 0)
-    );
-    const totalCostoNacional = round2(
-      lineas.reduce((acc, l) => acc + l.costoLocal * l.cantidad, 0)
-    );
-
     const c = await pool.connect();
     try {
       await c.query('begin');
@@ -539,9 +535,7 @@ export const arcStore = {
       const primerDetalle = Number(seqDetalle.rows[0].n);
 
       const tipo = configuracion.tipo;
-      const base = round2(Number(data.subtotal) - Number(data.descuento));
       const impuestoPorcent = round2(config.taxRate * 100);
-      const cantidadItems = lineas.length;
 
       const cabecera = {
         trn_autoincrement: autoincrement,
@@ -552,12 +546,8 @@ export const arcStore = {
         trn_fechaemision: ahora,
         trn_depositosource: deposito,
         trn_depositodestino: null,
-        trn_totalitems: cantidadItems,
-        trn_totalitemsinicial: cantidadItems,
         trn_moneda: moneda,
         trn_factorcambio: factor,
-        trn_totalcosto: round2(data.subtotal),
-        trn_totalcostoreal: totalCostoReal,
         trn_clasificacion: 0,
         trn_descripclasify: null,
         trn_user: Number(data.vendedor_id) || null,
@@ -567,9 +557,7 @@ export const arcStore = {
         trn_detalle: data.observacion || null,
         trn_tienelotes: false,
         trn_updateitems: true,
-        trn_totalbruto: round2(data.subtotal),
         trn_descuento1porcent: 0,
-        trn_descuento1monto: round2(data.descuento),
         trn_descuento1origen: 1,
         trn_descuento2porcent: 0,
         trn_descuento2monto: 0,
@@ -578,14 +566,10 @@ export const arcStore = {
         trn_fleteporcent: 0,
         trn_fletemoneda: 0,
         trn_fleteorigen: 1,
-        trn_baseimponible: base,
         trn_baseimponible2: 0,
-        trn_impuesto1porcent: impuestoPorcent,
-        trn_impuesto1monto: round2(data.impuestos),
         trn_impuesto2porcent: 0,
         trn_impuesto2monto: 0,
         trn_descuentocuadre: 0,
-        trn_totalneto: round2(data.total),
         trn_fechavencido: fechaVencido,
         trn_diasvencimiento: diasCredito,
         trn_rifcliente: cliente.rif || null,
@@ -598,11 +582,9 @@ export const arcStore = {
         trn_existeplanillaimportacion: false,
         trn_porcentfletesinasignar: 0,
         trn_monedapago: config.paymentCurrency,
-        trn_totalprecio: base,
         trn_vuelto: 0,
         trn_autorizados: null,
         trn_excento: Boolean(cliente.exento),
-        trn_costodeventa: totalCostoReal,
         trn_tipooperacionorigen: 0,
         trn_documentoorigen: null,
         trn_fromcompuestos: false,
@@ -629,8 +611,6 @@ export const arcStore = {
         trn_guiadespacho: null,
         trn_norecibocaja: null,
         trn_ctocosto: null,
-        trn_costoactualnacional: totalCostoNacional,
-        trn_costoactualex: totalCostoExt,
         trn_prefixinventario: null,
         trn_numerocontrol: null,
         trn_costoajustado: 0,
@@ -812,13 +792,31 @@ export const arcStore = {
         );
       }
 
+      const { rows: filasOficiales } = await c.query(
+        `select trn_totalbruto as subtotal,
+                trn_descuento1monto as descuento,
+                trn_impuesto1monto as impuestos,
+                trn_totalneto as total,
+                trn_totalitems as items,
+                trn_sync_status as sync_status
+           from arc_transacciones
+          where trn_id_auto = $1`,
+        [idTrn]
+      );
+      const o = filasOficiales[0] || {};
+
       await c.query('commit');
       return {
         id: idTrn,
         numero,
         fecha: ahora.toISOString(),
         estado: aEstado(status),
-        total: data.total
+        subtotal: Number(o.subtotal) || 0,
+        descuento: Number(o.descuento) || 0,
+        impuestos: Number(o.impuestos) || 0,
+        total: Number(o.total) || 0,
+        items: Number(o.items) || 0,
+        sync_status: o.sync_status
       };
     } catch (err) {
       await c.query('rollback');

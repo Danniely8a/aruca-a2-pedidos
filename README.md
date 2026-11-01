@@ -150,13 +150,16 @@ invalida al guardar). Los endpoints responden `401` sin token y `403` a los vend
 
 ## Reglas de negocio
 
-- **IVA**: se calcula sobre `subtotal − descuento`. `TAX_RATE=0.16`.
-- **Listas de precios**: de `arc_inv_costos_precios` (columnas `icp_p01…icp_p06…`). Si el cliente tiene `cli_preciodefecto` distinto a la lista general, la API devuelve esos precios como especiales y el carrito los usa automáticamente.
+- **IVA**: lo calculan los triggers de PostgreSQL sobre la base imponible. `TAX_RATE=0.16`.
+- **Sin descuentos por línea**: los pedidos web usan únicamente el precio de lista seleccionado.
+- **Listas de precios**: en pedidos en dólares (`trn_moneda=2`) se usan las columnas `icp_p01…icp_p06` con sufijo `preciototalext`. `trn_tipoprecio` 0→lista 1, 1→lista 2, 2→lista 3 (Precio mayor) y 3→lista 4 (Mayor Bs). Si el cliente tiene `cli_preciodefecto`, la lista automática usa esa lista.
 - **Estados** (`trn_status`, códigos 1..5): `borrador` 1, `aprobado` 2, `facturado` 3, `enviado` 4 y `rechazado` 5. Los pedidos creados desde la web quedan en **4 (enviado)**. Solo un admin cambia el estado.
 - **Números de documento**: desde `arc_correlatives` (`cor_modname='Pedidos'`, configurable en `/configuracion`); si no existe el módulo, genera la secuencia solo.
 - **Escritura transaccional**: cada pedido se inserta con `BEGIN … COMMIT` (cabecera + líneas) y se revierte ante cualquier error.
+- **Triggers oficiales**: `server/sql/triggers.sql` calcula precios, impuestos, costos y totales en PostgreSQL. Se aplican con `npm run db:triggers`.
 - **Mapeo A2 del detalle**: `dtv_operacion_autoincrement` enlaza con `trn_autoincrement`; `dtv_autoincrement`/`dtv_base_autoincrement` son únicos por línea, `dtv_linea` empieza en 0 y `dtv_status` copia el estado del pedido.
 - **Impuestos en el detalle**: `dtv_impuesto1=16`, `dtv_montoimpuesto1` se guarda **por unidad** y `dtv_preciodeventa = dtv_preciocondescuento + dtv_montoimpuesto1`.
+- **Sincronización**: todo pedido nace con `trn_sync_status=false`; la web lo muestra como “Pendiente por sincronizar”. Un pedido con `sync_status=true` ya no se puede modificar.
 - **Vendedor**: se resuelve por nombre contra `arc_vendedores.vnd_codigo` (no con `arc_users.usr_codigo`).
 - **Valores por defecto del mapeo**: moneda 2, moneda de pago 2, depósito 1, serie `WEB`, máquina `WEB`, origen de precio 3. Se configuran con `A2_MONEDA`, `A2_MONEDA_PAGO`, `A2_DEPOSITO`, `A2_SERIE` y `A2_MAQUINA`.
 - **Tablas auxiliares de la app**: `app_accesos` (contraseñas bcrypt), `app_config` (parámetros de la plataforma) y `app_clientes_extra` (correo y tipo de contribuyente). Se crean solas al arrancar; las tablas `arc_*` del A2 **nunca cambian de estructura**.
