@@ -151,6 +151,11 @@ begin
 end;
 $$;
 
+-- Desactivar triggers antiguos/duplicados que calculan precios en bolívares
+-- y sobrescriben los precios en dólares.
+drop trigger if exists trg_dtv_calcular_totales on arc_detalletranvtas;
+drop trigger if exists trg_actualizar_totales_cabecera on arc_detalletranvtas;
+
 drop trigger if exists trg_dtv_calcular_precios on arc_detalletranvtas;
 create trigger trg_dtv_calcular_precios
 before insert or update on arc_detalletranvtas

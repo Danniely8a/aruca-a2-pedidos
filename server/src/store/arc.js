@@ -199,7 +199,7 @@ const SQL_PEDIDOS = `
          u.usr_idauto as vendedor_id,
          u.usr_descripcion as vendedor_nombre
     from arc_transacciones t
-    left join arc_clientes c on c.cli_rif = t.trn_rifcliente
+    left join arc_clientes c on c.cli_codigo = t.trn_responsable
     left join arc_users u on u.usr_codigo = t.trn_vendedorasignado`;
 
 function mapearPedido(r) {
@@ -1059,7 +1059,7 @@ export const arcStore = {
                   count(*) as pedidos,
                   coalesce(sum(t.trn_totalneto), 0) as total
              from arc_transacciones t
-             left join arc_clientes c on c.cli_rif = t.trn_rifcliente
+             left join arc_clientes c on c.cli_codigo = t.trn_responsable
             where ${filtro}
             group by 1, 2
             order by total desc
