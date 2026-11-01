@@ -65,6 +65,7 @@ export default function OrderDetail() {
           </p>
         </div>
         <div className="page-head-tags">
+          <span className="tag">{pedido.tipo === 9 ? 'Presupuesto' : 'Pedido'}</span>
           <EstadoTag estado={pedido.estado} />
           {pedido.sync_status === false && (
             <span className="tag tag-borrador">Pendiente por sincronizar</span>
@@ -212,7 +213,7 @@ export default function OrderDetail() {
 
       <div className="actions">
         <Link className="btn btn-primary" to="/pedido">
-          Montar otro pedido
+          Montar otro documento
         </Link>
         <Link className="btn btn-ghost" to="/pedidos">
           Ver historial

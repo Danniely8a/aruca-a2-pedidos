@@ -34,7 +34,7 @@ export default function Dashboard() {
         <div className="page-actions">
           <InstallApp />
           <button className="btn btn-primary" onClick={() => navigate('/pedido')}>
-            Montar nuevo pedido
+            Montar nuevo documento
           </button>
         </div>
       </div>
@@ -104,7 +104,7 @@ export default function Dashboard() {
           </div>
           <div className="quick">
             <Link className="quick-item" to="/pedido">
-              <strong>Montar pedido</strong>
+              <strong>Montar documento</strong>
               <span>Selecciona cliente y agrega productos</span>
             </Link>
             <Link className="quick-item" to="/productos">

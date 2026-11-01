@@ -12,6 +12,7 @@ export default function OrderHistory() {
   const [items, setItems] = useState([]);
   const [q, setQ] = useState('');
   const [estado, setEstado] = useState('');
+  const [tipo, setTipo] = useState('');
   const [todos, setTodos] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,6 +30,7 @@ export default function OrderHistory() {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (estado) params.set('estado', estado);
+    if (tipo) params.set('tipo', tipo);
     if (todos && user.rol === 'admin') params.set('todos', '1');
     const t = setTimeout(() => {
       api(`/api/pedidos?${params.toString()}`)
@@ -40,14 +42,14 @@ export default function OrderHistory() {
       cancel = true;
       clearTimeout(t);
     };
-  }, [q, estado, todos, user]);
+  }, [q, estado, tipo, todos, user]);
 
   return (
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Historial de pedidos</h1>
-          <p className="muted">Seguimiento de todo lo que has montado</p>
+          <h1>Historial de documentos</h1>
+          <p className="muted">Pedidos y presupuestos montados desde la web</p>
         </div>
       </div>
 
@@ -58,6 +60,15 @@ export default function OrderHistory() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <select
+          className="input select"
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value)}
+        >
+          <option value="">Pedidos y presupuestos</option>
+          <option value="10">Pedidos</option>
+          <option value="9">Presupuestos</option>
+        </select>
         <select className="input select" value={estado} onChange={(e) => setEstado(e.target.value)}>
           <option value="">Todos los estados</option>
           {estados.map((e) => (
@@ -69,14 +80,16 @@ export default function OrderHistory() {
         {user.rol === 'admin' && (
           <label className="check">
             <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
-            Ver pedidos de todos los vendedores
+            Ver documentos de todos los vendedores
           </label>
         )}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
-      {loading && <p className="empty">Cargando pedidos…</p>}
-      {!loading && items.length === 0 && <p className="empty">No hay pedidos con esos filtros.</p>}
+      {loading && <p className="empty">Cargando documentos…</p>}
+      {!loading && items.length === 0 && (
+        <p className="empty">No hay documentos con esos filtros.</p>
+      )}
 
       {!loading && items.length > 0 && (
         <div className="table-wrap card">
@@ -84,6 +97,7 @@ export default function OrderHistory() {
             <thead>
               <tr>
                 <th>Número</th>
+                <th>Tipo</th>
                 <th>Fecha</th>
                 <th>Cliente</th>
                 <th>Vendedor</th>
@@ -96,6 +110,11 @@ export default function OrderHistory() {
                 <tr key={p.id} className="row-click" onClick={() => navigate(`/pedidos/${p.id}`)}>
                   <td>
                     <strong>{p.numero}</strong>
+                  </td>
+                  <td>
+                    <span className="tag">
+                      {Number(p.tipo) === 9 ? 'Presupuesto' : 'Pedido'}
+                    </span>
                   </td>
                   <td>{new Date(p.fecha).toLocaleString('es-VE', { dateStyle: 'medium', timeStyle: 'short' })}</td>
                   <td>{p.cliente?.nombre}</td>

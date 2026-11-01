@@ -156,3 +156,7 @@ where not exists (select 1 from arc_clientes);
 insert into arc_correlatives (cor_modname, cor_proximo, cor_emp_codigo, cor_fechacreacion, cor_fechasistema, cor_usercreator, cor_namemachine)
 select 'Pedidos', 1, 'ARUCA', now(), now(), 'seed-demo', 'A2-WEB'
 where not exists (select 1 from arc_correlatives where cor_modname = 'Pedidos');
+
+insert into arc_correlatives (cor_modname, cor_proximo, cor_emp_codigo, cor_fechacreacion, cor_fechasistema, cor_usercreator, cor_namemachine)
+select 'Presupuestos', 1, 'ARUCA', now(), now(), 'seed-demo', 'A2-WEB'
+where not exists (select 1 from arc_correlatives where cor_modname = 'Presupuestos');

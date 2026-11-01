@@ -21,7 +21,8 @@ router.get(
     const items = await store.listOrders({
       vendedorId,
       q: req.query.q || '',
-      estado: req.query.estado || ''
+      estado: req.query.estado || '',
+      tipo: req.query.tipo || null
     });
     res.json({ items, total: items.length });
   })
@@ -30,10 +31,19 @@ router.get(
 router.post(
   '/pedidos',
   asyncHandler(async (req, res) => {
-    const { cliente_id, observacion = '', items, vendedor_id, lista } = req.body || {};
+    const { cliente_id, observacion = '', items, vendedor_id, lista, tipo } =
+      req.body || {};
 
     const nLista = Number(lista);
     const listaSel = Number.isInteger(nLista) && nLista >= 1 && nLista <= 6 ? nLista : null;
+
+    const tipoRaw =
+      tipo === undefined || tipo === null || tipo === '' ? 10 : Number(tipo);
+    if (tipoRaw !== 9 && tipoRaw !== 10) {
+      throw new ApiError(400, 'Tipo de documento no válido (9 o 10)');
+    }
+    const tipoSel = tipoRaw;
+    const estado = tipoSel === 9 ? 'borrador' : 'enviado';
 
     if (!cliente_id) throw new ApiError(400, 'Debes seleccionar un cliente');
     if (!Array.isArray(items) || items.length === 0) {
@@ -86,7 +96,8 @@ router.post(
     const pedido = await store.createOrder({
       cliente_id: cliente.id,
       vendedor_id: responsable,
-      estado: 'enviado',
+      tipo: tipoSel,
+      estado,
       lista: listaSel,
       observacion: String(observacion || '').slice(0, 500),
       subtotal: totales.subtotal,

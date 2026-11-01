@@ -183,6 +183,7 @@ const SQL_PEDIDOS = `
   select t.trn_id_auto as id,
          t.trn_documento as numero,
          t.trn_fechaemision as fecha,
+         t.trn_tipo as tipo,
          t.trn_status as status,
          t.trn_totalneto as total,
          t.trn_totalbruto as subtotal,
@@ -206,6 +207,7 @@ function mapearPedido(r) {
     id: Number(r.id),
     numero: r.numero,
     fecha: r.fecha,
+    tipo: Number(r.tipo) || 10,
     estado: aEstado(r.status),
     subtotal: Number(r.subtotal || 0),
     descuento: Number(r.descuento || 0),
@@ -476,7 +478,10 @@ export const arcStore = {
     const maquina = config.machine;
     const serie = config.serie;
 
-    const estadoNombre = data.estado || 'enviado';
+    const tipoSolicitado = Number(data.tipo);
+    const tipoDocumento = tipoSolicitado === 9 ? 9 : 10;
+    const estadoNombre =
+      data.estado || (tipoDocumento === 9 ? 'borrador' : 'enviado');
     const status = aCodigo(estadoNombre);
     const listaUsada = Number(data.lista) || Number(cliente.lista_precio) || 1;
     const tipoPrecio = Math.min(3, Math.max(0, listaUsada - 1));
@@ -523,7 +528,9 @@ export const arcStore = {
       await c.query('begin');
 
       const configuracion = await cfg();
-      const { numero } = await nextDocumento(c, configuracion.modulo);
+      const tipo = tipoDocumento;
+      const modulo = tipo === 9 ? 'Presupuestos' : configuracion.modulo;
+      const { numero } = await nextDocumento(c, modulo);
       const auto = await c.query(
         'select coalesce(max(trn_autoincrement), 0) + 1 as n from arc_transacciones'
       );
@@ -534,7 +541,6 @@ export const arcStore = {
       );
       const primerDetalle = Number(seqDetalle.rows[0].n);
 
-      const tipo = configuracion.tipo;
       const impuestoPorcent = round2(config.taxRate * 100);
 
       const cabecera = {
@@ -810,6 +816,7 @@ export const arcStore = {
         id: idTrn,
         numero,
         fecha: ahora.toISOString(),
+        tipo,
         estado: aEstado(status),
         subtotal: Number(o.subtotal) || 0,
         descuento: Number(o.descuento) || 0,
@@ -849,9 +856,16 @@ export const arcStore = {
     return p[0] ? mapearPedido(p[0]) : null;
   },
 
-  async listOrders({ vendedorId = null, q: term = '', estado = '' } = {}) {
+  async listOrders({ vendedorId = null, q: term = '', estado = '', tipo = null } = {}) {
     const params = [];
-    const where = [`t.trn_tipo = $${(params.push((await cfg()).tipo), params.length)}`];
+    const where = [];
+    const tipoSel = Number(tipo);
+    if (tipoSel === 9 || tipoSel === 10) {
+      params.push(tipoSel);
+      where.push(`t.trn_tipo = $${params.length}`);
+    } else {
+      where.push('t.trn_tipo in (9, 10)');
+    }
 
     if (vendedorId) {
       const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [
@@ -946,14 +960,19 @@ export const arcStore = {
     };
   },
 
-  async reportes({ desde, hasta, vendedorId = null } = {}) {
-    const { tipo } = await cfg();
-    const params = [tipo, desde, hasta];
+  async reportes({ desde, hasta, vendedorId = null, tipo = null } = {}) {
+    const params = [desde, hasta];
     const where = [
-      't.trn_tipo = $1',
-      't.trn_fechaemision >= $2',
-      't.trn_fechaemision <= $3'
+      't.trn_fechaemision >= $1',
+      't.trn_fechaemision <= $2'
     ];
+    const tipoSel = Number(tipo);
+    if (tipoSel === 9 || tipoSel === 10) {
+      params.push(tipoSel);
+      where.push(`t.trn_tipo = $${params.length}`);
+    } else {
+      where.push('t.trn_tipo in (9, 10)');
+    }
 
     if (vendedorId) {
       const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [

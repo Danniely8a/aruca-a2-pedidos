@@ -628,6 +628,79 @@ async function main() {
       (detalleLista.data.precios || []).length === 0,
       `=${detalleLista.data.precios?.length}`
     );
+
+    // --- Presupuestos (tipo 9) -----------------------------------------
+    const presupuesto = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 9,
+        lista: 3,
+        items: [{ producto_id: p1?.id, cantidad: 1, precio: Number(p1.precio) }]
+      }
+    });
+    check(
+      'crear presupuesto → 201',
+      presupuesto.status === 201,
+      JSON.stringify(presupuesto.data)
+    );
+    check(
+      'presupuesto con tipo 9 y estado borrador',
+      Number(presupuesto.data?.pedido?.tipo) === 9 &&
+        presupuesto.data?.pedido?.estado === 'borrador',
+      JSON.stringify(presupuesto.data?.pedido)
+    );
+
+    const preCab = await pool.query(
+      `select trn_tipo, trn_status, trn_documento, trn_sync_status, trn_autoincrement
+         from a2_test.arc_transacciones where trn_id_auto = $1`,
+      [presupuesto.data.pedido.id]
+    );
+    const pc = preCab.rows[0];
+    check(
+      'presupuesto en cabecera: tipo 9, estado 1 y pendiente de sincronizar',
+      Number(pc?.trn_tipo) === 9 &&
+        Number(pc?.trn_status) === 1 &&
+        pc?.trn_sync_status === false,
+      JSON.stringify(pc)
+    );
+
+    const preDet = await pool.query(
+      `select dtv_tipooperacion, dtv_operacion_autoincrement, dtv_autoincrement,
+              dtv_linea, dtv_status
+         from a2_test.arc_detalletranvtas
+        where dtv_operacion_autoincrement = $1 and dtv_documento = $2`,
+      [pc?.trn_autoincrement, pc?.trn_documento]
+    );
+    check(
+      'detalle del presupuesto tipo 9 y enlazado',
+      preDet.rows.length === 1 &&
+        Number(preDet.rows[0].dtv_tipooperacion) === 9 &&
+        Number(preDet.rows[0].dtv_operacion_autoincrement) ===
+          Number(pc?.trn_autoincrement) &&
+        Number(preDet.rows[0].dtv_linea) === 0,
+      JSON.stringify(preDet.rows)
+    );
+
+    const listaPresupuestos = await req('/api/pedidos?tipo=9', { token: tCarlos });
+    check(
+      'historial filtra solo presupuestos',
+      (listaPresupuestos.data.items || []).some(
+        (x) => x.id === presupuesto.data.pedido.id
+      ) && (listaPresupuestos.data.items || []).every((x) => Number(x.tipo) === 9)
+    );
+
+    const tipoInvalido = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 7,
+        items: [{ producto_id: p1?.id, cantidad: 1, precio: Number(p1.precio) }]
+      }
+    });
+    check('tipo de documento inválido → 400', tipoInvalido.status === 400, `=${tipoInvalido.status}`);
   } finally {
     servidor.kill();
     await new Promise((r) => setTimeout(r, 500));

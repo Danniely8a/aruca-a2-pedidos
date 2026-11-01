@@ -137,7 +137,11 @@ async function crearImagen({ pedido, empresa, currency }) {
   ctx.textAlign = 'right';
   ctx.fillStyle = MUTED;
   ctx.font = '700 10.5px "Segoe UI", Arial, sans-serif';
-  ctx.fillText('COMPROBANTE DE PEDIDO', W - M, 40);
+  ctx.fillText(
+    pedido?.tipo === 9 ? 'PRESUPUESTO' : 'COMPROBANTE DE PEDIDO',
+    W - M,
+    40
+  );
   ctx.fillStyle = AZUL;
   ctx.font = '700 22px "Segoe UI", Arial, sans-serif';
   ctx.fillText(pedido?.numero || '', W - M, 68);
@@ -337,14 +341,19 @@ export default function ComprobantePedido({ pedido, empresa, currency = '$' }) {
     };
   }, [pedido, empresa, currency]);
 
-  const archivo = `pedido-${String(pedido?.numero || 'a2').replace(/[^\w.-]+/g, '-')}.png`;
+  const archivo = `${pedido?.tipo === 9 ? 'presupuesto' : 'pedido'}-${String(
+    pedido?.numero || 'a2'
+  ).replace(/[^\w.-]+/g, '-')}.png`;
 
   const compartir = async () => {
     try {
       const blob = await (await fetch(imagen)).blob();
       const file = new File([blob], archivo, { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `Pedido ${pedido?.numero || ''}` });
+        await navigator.share({
+          files: [file],
+          title: `${pedido?.tipo === 9 ? 'Presupuesto' : 'Pedido'} ${pedido?.numero || ''}`
+        });
       }
     } catch {
       // el usuario canceló o el navegador no permite compartir
@@ -355,7 +364,9 @@ export default function ComprobantePedido({ pedido, empresa, currency = '$' }) {
     <section className="card comprobante">
       <div className="card-head">
         <div>
-          <h2>Comprobante del pedido</h2>
+          <h2>
+            Comprobante del {pedido?.tipo === 9 ? 'presupuesto' : 'pedido'}
+          </h2>
           <p className="muted">Imagen con membrete de ARUCA, artículos y total</p>
         </div>
       </div>
@@ -365,7 +376,11 @@ export default function ComprobantePedido({ pedido, empresa, currency = '$' }) {
 
       {imagen && (
         <>
-          <img className="comprobante-preview" src={imagen} alt={`Pedido ${pedido?.numero}`} />
+          <img
+            className="comprobante-preview"
+            src={imagen}
+            alt={`${pedido?.tipo === 9 ? 'Presupuesto' : 'Pedido'} ${pedido?.numero}`}
+          />
           <div className="actions">
             <a className="btn btn-primary" href={imagen} download={archivo}>
               Descargar imagen

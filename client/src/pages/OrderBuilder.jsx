@@ -29,6 +29,8 @@ export default function OrderBuilder() {
   const [nuevo, setNuevo] = useState(nuevoClienteVacio);
   const [creando, setCreando] = useState(false);
   const [errorCliente, setErrorCliente] = useState('');
+  const [tipo, setTipo] = useState(10);
+  const esPresupuesto = tipo === 9;
 
   const campo = (name) => ({
     value: nuevo[name],
@@ -59,7 +61,7 @@ export default function OrderBuilder() {
   const enviar = async () => {
     setError('');
     if (!cart.cliente) {
-      setError('Selecciona o registra el cliente del pedido.');
+      setError('Selecciona o registra el cliente del documento.');
       return;
     }
     if (cart.cliente.activo === false) {
@@ -93,10 +95,13 @@ export default function OrderBuilder() {
         cliente_id: cart.cliente.id,
         observacion: cart.observacion,
         lista: cart.lista || undefined,
+        tipo,
         items
       });
       cart.reset();
-      toast.show(`Pedido ${data.pedido.numero} completado y enviado al A2`);
+      toast.show(
+        `${esPresupuesto ? 'Presupuesto' : 'Pedido'} ${data.pedido.numero} completado y enviado al A2`
+      );
       navigate(`/pedidos/${data.pedido.id}`);
     } catch (e) {
       setError(e.message);
@@ -109,12 +114,34 @@ export default function OrderBuilder() {
     <div className="page order-page">
       <div className="page-head">
         <div>
-          <h1>Nuevo pedido</h1>
-          <p className="muted">Cliente → moneda → productos → envío al sistema A2</p>
+          <h1>{esPresupuesto ? 'Nuevo presupuesto' : 'Nuevo pedido'}</h1>
+          <p className="muted">
+            {esPresupuesto
+              ? 'Presupuesto (tipo 9) → cliente → productos → envío al sistema A2'
+              : 'Pedido (tipo 10) → cliente → productos → envío al sistema A2'}
+          </p>
         </div>
-        <Link to="/productos" className="btn btn-ghost">
-          Ver catálogo
-        </Link>
+        <div className="page-actions">
+          <div className="tabs">
+            <button
+              type="button"
+              className={`tab ${tipo === 10 ? 'active' : ''}`}
+              onClick={() => setTipo(10)}
+            >
+              Pedido
+            </button>
+            <button
+              type="button"
+              className={`tab ${tipo === 9 ? 'active' : ''}`}
+              onClick={() => setTipo(9)}
+            >
+              Presupuesto
+            </button>
+          </div>
+          <Link to="/productos" className="btn btn-ghost">
+            Ver catálogo
+          </Link>
+        </div>
       </div>
 
       <div className="builder">
@@ -485,10 +512,14 @@ export default function OrderBuilder() {
                 cart.cliente.activo === false
               }
             >
-              {enviando ? 'Enviando…' : 'Enviar pedido'}
+              {enviando
+                ? 'Enviando…'
+                : esPresupuesto
+                  ? 'Enviar presupuesto'
+                  : 'Enviar pedido'}
             </button>
             <p className="hint">
-              Al enviar, el pedido queda completado y registrado en el sistema A2.
+              Al enviar, el documento queda completado y registrado en el sistema A2.
             </p>
             <button
               className="btn btn-ghost btn-block"
@@ -512,7 +543,7 @@ export default function OrderBuilder() {
       <div className="mobile-order-bar">
         {error && <div className="alert alert-error mobile-order-error">{error}</div>}
         <div className="mobile-order-bar-info">
-          <span>Total del pedido</span>
+          <span>Total del {esPresupuesto ? 'presupuesto' : 'pedido'}</span>
           <strong>
             {cart.currency}
             {cart.total.toFixed(2)}
@@ -528,7 +559,11 @@ export default function OrderBuilder() {
             cart.cliente.activo === false
           }
         >
-          {enviando ? 'Enviando…' : 'Enviar pedido'}
+          {enviando
+            ? 'Enviando…'
+            : esPresupuesto
+              ? 'Enviar presupuesto'
+              : 'Enviar pedido'}
         </button>
       </div>
     </div>

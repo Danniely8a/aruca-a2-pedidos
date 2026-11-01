@@ -228,11 +228,13 @@ export const memoryStore = {
 
   createOrder: async (data) => {
     secuenciaPedido += 1;
+    const tipo = Number(data.tipo) === 9 ? 9 : 10;
     const order = {
       id: secuenciaPedido,
-      numero: `PED-${String(secuenciaPedido).padStart(6, '0')}`,
+      numero: `${tipo === 9 ? 'PRE' : 'PED'}-${String(secuenciaPedido).padStart(6, '0')}`,
       fecha: new Date().toISOString(),
-      estado: 'enviado',
+      tipo,
+      estado: data.estado || (tipo === 9 ? 'borrador' : 'enviado'),
       ...data
     };
     pedidos = [order, ...pedidos];
@@ -244,11 +246,13 @@ export const memoryStore = {
     order.estado = estado;
     return order;
   },
-  listOrders: async ({ vendedorId = null, q = '', estado = '' } = {}) => {
+  listOrders: async ({ vendedorId = null, q = '', estado = '', tipo = null } = {}) => {
     const term = q.trim().toLowerCase();
+    const tipoSel = Number(tipo);
     return pedidos
       .filter((p) => (!vendedorId || p.vendedor_id === Number(vendedorId)))
       .filter((p) => !estado || p.estado === estado)
+      .filter((p) => !tipoSel || (Number(p.tipo) || 10) === tipoSel)
       .filter((p) => {
         if (!term) return true;
         const cliente = byId(clientes, p.cliente_id);
@@ -282,9 +286,9 @@ export const memoryStore = {
     const mes = new Date();
     mes.setDate(1);
     mes.setHours(0, 0, 0, 0);
-    const propios = vendedorId
-      ? pedidos.filter((p) => p.vendedor_id === Number(vendedorId))
-      : pedidos;
+    const propios = pedidos
+      .filter((p) => (Number(p.tipo) || 10) === 10)
+      .filter((p) => !vendedorId || p.vendedor_id === Number(vendedorId));
     const delMes = propios.filter((p) => new Date(p.fecha) >= mes);
     return {
       pedidos_mes: delMes.length,
@@ -297,9 +301,10 @@ export const memoryStore = {
     };
   },
 
-  async reportes({ desde, hasta, vendedorId = null } = {}) {
+  async reportes({ desde, hasta, vendedorId = null, tipo = null } = {}) {
     const from = new Date(desde);
     const to = new Date(hasta);
+    const tipoSel = Number(tipo);
     const fechaLocal = (fecha) => {
       try {
         return new Intl.DateTimeFormat('en-CA', {
@@ -315,7 +320,12 @@ export const memoryStore = {
 
     const lista = pedidos.filter((p) => {
       const f = new Date(p.fecha);
-      return f >= from && f <= to && (!vendedorId || p.vendedor_id === Number(vendedorId));
+      return (
+        f >= from &&
+        f <= to &&
+        (!vendedorId || p.vendedor_id === Number(vendedorId)) &&
+        (!tipoSel || (Number(p.tipo) || 10) === tipoSel)
+      );
     });
 
     const diario = new Map();

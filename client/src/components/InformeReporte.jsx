@@ -31,6 +31,7 @@ export default function InformeReporte({
   datos,
   currency = '$',
   agrupacion = 'dia',
+  tipo = '10',
   desde,
   hasta,
   usuario,
@@ -96,7 +97,13 @@ export default function InformeReporte({
               </div>
             </div>
             <div className="informe-meta">
-              <span className="informe-kicker">Informe de pedidos</span>
+              <span className="informe-kicker">
+                {tipo === '9'
+                  ? 'Informe de presupuestos'
+                  : tipo === 'todos'
+                    ? 'Informe de pedidos y presupuestos'
+                    : 'Informe de pedidos'}
+              </span>
               <strong>
                 {fechaLarga(desde)} — {fechaLarga(hasta)}
               </strong>

@@ -26,7 +26,16 @@ router.get(
     }
 
     const vendedorId = req.user.rol === 'admin' ? null : req.user.id;
-    const reporte = await store.reportes({ desde, hasta, vendedorId });
+    const tipoRaw = req.query.tipo;
+    const tipo =
+      tipoRaw === 'todos'
+        ? null
+        : Number(tipoRaw) === 9
+          ? 9
+          : Number(tipoRaw) === 10
+            ? 10
+            : 10;
+    const reporte = await store.reportes({ desde, hasta, vendedorId, tipo });
     const empresa = await store.getCompany();
     res.json({ ...reporte, empresa });
   })

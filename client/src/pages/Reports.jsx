@@ -62,6 +62,7 @@ export default function Reports() {
   const [hasta, setHasta] = useState(inicial.hasta);
   const [agrupacion, setAgrupacion] = useState('dia');
   const [detalle, setDetalle] = useState('productos');
+  const [tipo, setTipo] = useState('10');
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -86,7 +87,8 @@ export default function Reports() {
       const fin = new Date(`${hasta}T23:59:59.999`);
       const params = new URLSearchParams({
         desde: inicio.toISOString(),
-        hasta: fin.toISOString()
+        hasta: fin.toISOString(),
+        tipo
       });
       api(`/api/reportes?${params.toString()}`)
         .then((d) => {
@@ -107,7 +109,7 @@ export default function Reports() {
       cancel = true;
       clearTimeout(timer);
     };
-  }, [desde, hasta]);
+  }, [desde, hasta, tipo]);
 
   const aplicarPreset = (tipo) => {
     setPreset(tipo);
@@ -135,7 +137,7 @@ export default function Reports() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Reportes de pedidos</h1>
+          <h1>Reportes de documentos</h1>
           <p className="muted">
             Del {new Date(`${desde}T00:00:00`).toLocaleDateString('es-VE')} al{' '}
             {new Date(`${hasta}T00:00:00`).toLocaleDateString('es-VE')}
@@ -177,6 +179,18 @@ export default function Reports() {
         </div>
         <div className="report-dates">
           <label className="report-date">
+            <span>Documento</span>
+            <select
+              className="input"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+            >
+              <option value="10">Pedidos</option>
+              <option value="9">Presupuestos</option>
+              <option value="todos">Ambos</option>
+            </select>
+          </label>
+          <label className="report-date">
             <span>Desde</span>
             <input
               className="input"
@@ -206,7 +220,7 @@ export default function Reports() {
         <>
           <div className="cards">
             <div className="card stat">
-              <span>Pedidos</span>
+              <span>Documentos</span>
               <strong>{resumen.pedidos}</strong>
             </div>
             <div className="card stat">
@@ -463,6 +477,7 @@ export default function Reports() {
           datos={datos}
           currency={cart.currency}
           agrupacion={agrupacion}
+          tipo={tipo}
           desde={desde}
           hasta={hasta}
           usuario={user}

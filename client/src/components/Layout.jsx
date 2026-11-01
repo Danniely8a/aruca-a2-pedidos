@@ -15,7 +15,7 @@ export default function Layout() {
 
   const NAV = [
     { to: '/', label: 'Inicio', icon: '◈' },
-    { to: '/pedido', label: 'Montar pedido', icon: '＋' },
+    { to: '/pedido', label: 'Montar documento', icon: '＋' },
     { to: '/productos', label: 'Productos', icon: '▦' },
     { to: '/clientes', label: 'Clientes', icon: '☺' },
     { to: '/pedidos', label: 'Historial', icon: '≣' },
@@ -85,7 +85,7 @@ export default function Layout() {
           <div className="topbar-title">Sistema A2 · Pedidos externos</div>
           <ServerStatus />
           <button className="btn btn-primary" onClick={() => navigate('/pedido')}>
-            Montar pedido
+            Montar documento
             {cart.count > 0 && <span className="badge badge-light">{cart.count}</span>}
           </button>
         </header>
