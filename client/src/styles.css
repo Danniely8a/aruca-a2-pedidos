@@ -1572,7 +1572,7 @@ p {
     z-index: 49;
   }
   .content {
-    padding: 18px 14px calc(78px + env(safe-area-inset-bottom));
+    padding: 18px 14px calc(92px + env(safe-area-inset-bottom));
   }
   .mobile-nav {
     display: flex;
@@ -1581,53 +1581,65 @@ p {
     right: 0;
     bottom: 0;
     z-index: 48;
-    gap: 2px;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-    background: #fff;
+    gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, #ffffff 0%, #f7f9ff 100%);
     border-top: 1px solid var(--borde);
     box-shadow: 0 -8px 24px rgba(16, 32, 64, 0.12);
-    overflow-x: auto;
   }
   .mobile-nav-link {
     position: relative;
-    flex: 1 0 50px;
-    min-width: 50px;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 50px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
-    padding: 6px 3px;
-    border-radius: 10px;
-    color: var(--muted);
+    padding: 5px 3px;
+    border-radius: 14px;
+    border: 1px solid #e3e8f0;
+    background: #f3f6fd;
+    box-shadow: 0 2px 8px rgba(16, 32, 64, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    color: #334155;
     text-decoration: none;
-    font-size: 0.6rem;
-    font-weight: 600;
+    font-size: 0.62rem;
+    font-weight: 700;
     line-height: 1.1;
     text-align: center;
     white-space: nowrap;
-    transition: 0.16s ease;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease,
+      color 0.16s ease;
+  }
+  .mobile-nav-link:active {
+    transform: scale(0.96);
   }
   .mobile-nav-link.active {
-    color: var(--azul);
-    background: #eef3ff;
+    color: #fff;
+    background: linear-gradient(135deg, var(--azul-claro), var(--azul));
+    border-color: var(--azul);
+    box-shadow: 0 8px 18px rgba(13, 56, 124, 0.32);
+    transform: translateY(-2px);
   }
   .mobile-nav-icon {
-    font-size: 1.15rem;
+    font-size: 1.2rem;
     line-height: 1;
   }
   .mobile-nav-badge {
     position: absolute;
-    top: 2px;
-    right: 8px;
+    top: 3px;
+    right: 6px;
     min-width: 15px;
     height: 15px;
     padding: 0 4px;
     border-radius: 999px;
-    background: var(--azul-claro);
+    background: var(--azul);
     color: #fff;
-    font-size: 0.6rem;
-    line-height: 15px;
+    border: 2px solid #fff;
+    font-size: 0.58rem;
+    line-height: 11px;
     font-weight: 700;
   }
   .topbar {
@@ -1762,7 +1774,7 @@ p {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(58px + env(safe-area-inset-bottom));
+    bottom: calc(66px + env(safe-area-inset-bottom));
     z-index: 45;
     background: #fff;
     border-top: 1px solid var(--borde);

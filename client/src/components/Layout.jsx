@@ -25,6 +25,10 @@ export default function Layout() {
       : [])
   ];
 
+  const MOBILE_NAV = NAV.filter((item) =>
+    ['/', '/pedido', '/productos', '/clientes', '/pedidos'].includes(item.to)
+  );
+
   const cerrarSesion = () => {
     logout();
     cart.reset();
@@ -98,7 +102,7 @@ export default function Layout() {
       </div>
 
       <nav className="mobile-nav" aria-label="Menú principal">
-        {NAV.map((item) => (
+        {MOBILE_NAV.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
