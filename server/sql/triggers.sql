@@ -34,6 +34,19 @@ begin
     return new;
   end if;
 
+  -- Interruptor temporal: precios en cero sin tocar las listas de precios.
+  if to_regclass('app_config') is not null then
+    if coalesce((select valor from app_config where clave = 'precios_cero'), '0') = '1' then
+      new.dtv_preciosindescuento := 0;
+      new.dtv_preciocondescuento := 0;
+      new.dtv_impuesto1 := 0;
+      new.dtv_montoimpuesto1 := 0;
+      new.dtv_preciodeventa := 0;
+      new.dtv_preciobasecomision := 0;
+      return new;
+    end if;
+  end if;
+
   -- trn_tipoprecio: 0 -> lista 1, 1 -> lista 2, 2 -> lista 3, 3 -> lista 4
   v_lista := least(6, greatest(1, v_tipoprecio + 1));
   v_col := 'icp_p' || lpad(v_lista::text, 2, '0') ||

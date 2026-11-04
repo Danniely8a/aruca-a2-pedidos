@@ -187,17 +187,25 @@ export default function OrderDetail() {
 
       {user.rol === 'admin' && pedido.sync_status === true && (
         <div className="alert alert-info">
-          Este pedido ya fue sincronizado con el A2. Solo se puede consultar.
+          Este documento ya fue sincronizado con el A2. Solo se puede consultar.
         </div>
       )}
 
-      {user.rol === 'admin' && pedido.sync_status !== true && (
+      {user.rol === 'admin' && pedido.estado === 'procesada' && (
+        <div className="alert alert-info">
+          Documento procesado: la existencia ya fue debitada y no se puede modificar.
+        </div>
+      )}
+
+      {user.rol === 'admin' &&
+        pedido.sync_status !== true &&
+        pedido.estado !== 'procesada' && (
         <section className="card">
           <div className="card-head">
             <h2>Acciones de administrador</h2>
           </div>
           <div className="actions">
-            {['aprobado', 'facturado', 'rechazado', 'enviado'].map((e) => (
+            {['procesada', 'pendiente', 'transito', 'eliminado', 'anulado'].map((e) => (
               <button
                 key={e}
                 className="btn btn-ghost btn-sm"

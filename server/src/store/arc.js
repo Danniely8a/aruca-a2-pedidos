@@ -7,13 +7,13 @@ const q = (text, params) => pool.query(text, params);
 // El A2 usa códigos 1..5 (no 0..4). El pedido que crea la web queda en 4
 // (enviado), tal como indica el mapeo de transacciones.
 const ESTADOS = [
-  { codigo: 1, nombre: 'borrador' },
-  { codigo: 2, nombre: 'aprobado' },
-  { codigo: 3, nombre: 'facturado' },
-  { codigo: 4, nombre: 'enviado' },
-  { codigo: 5, nombre: 'rechazado' }
+  { codigo: 1, nombre: 'procesada' },
+  { codigo: 2, nombre: 'pendiente' },
+  { codigo: 3, nombre: 'eliminado' },
+  { codigo: 4, nombre: 'transito' },
+  { codigo: 5, nombre: 'anulado' }
 ];
-const aEstado = (n) => ESTADOS.find((e) => e.codigo === Number(n))?.nombre ?? 'enviado';
+const aEstado = (n) => ESTADOS.find((e) => e.codigo === Number(n))?.nombre ?? 'transito';
 const aCodigo = (nombre) => ESTADOS.find((e) => e.nombre === nombre)?.codigo ?? 4;
 
 const pad = (n) => String(n).padStart(6, '0');
@@ -40,6 +40,40 @@ async function codigoVendedorPorUsuario(userId) {
     (v) => normalizar(v.vnd_descripcion) === normalizar(u.usr_descripcion)
   );
   return match?.vnd_codigo || null;
+}
+
+async function disponibilidadProducto(cliente, codigo, excluir = null) {
+  const params = [codigo];
+  let filtroExcluir = '';
+  if (excluir) {
+    params.push(excluir.autoincrement, excluir.documento);
+    filtroExcluir =
+      'and not (t.trn_autoincrement = $2 and t.trn_documento = $3)';
+  }
+  const [existencia, reservado] = await Promise.all([
+    cliente.query(
+      `select coalesce(sum(exa_existencia), 0) as existencia
+         from arc_existencia_actual
+        where exa_codigoproducto = $1`,
+      [codigo]
+    ),
+    cliente.query(
+      `select coalesce(sum(d.dtv_cantidad), 0) as reservado
+         from arc_detalletranvtas d
+         join arc_transacciones t
+           on t.trn_autoincrement = d.dtv_operacion_autoincrement
+          and t.trn_documento = d.dtv_documento
+        where d.dtv_codigo = $1
+          and t.trn_tipo = 10
+          and t.trn_status in (2, 4)
+          ${filtroExcluir}`,
+      params
+    )
+  ]);
+  return (
+    Number(existencia.rows[0]?.existencia || 0) -
+    Number(reservado.rows[0]?.reservado || 0)
+  );
 }
 
 async function factorDolar() {
@@ -87,6 +121,7 @@ async function cfg() {
   let tipo = config.orderTipo;
   let modulo = config.orderModule;
   let lista = config.priceLevel;
+  let preciosCero = false;
   try {
     const { rows } = await q('select clave, valor from app_config');
     const m = {};
@@ -94,10 +129,11 @@ async function cfg() {
     if (m.tipo_operacion_pedidos) tipo = Number(m.tipo_operacion_pedidos) || tipo;
     if (m.modulo_correlativo_pedidos) modulo = m.modulo_correlativo_pedidos;
     if (m.lista_precios) lista = Math.min(6, Math.max(1, Number(m.lista_precios) || lista));
+    preciosCero = m.precios_cero === '1';
   } catch {
     // app_config todavía no existe: se usan los valores por defecto
   }
-  cacheCfg = { tipo, modulo, lista };
+  cacheCfg = { tipo, modulo, lista, preciosCero };
   cacheTs = Date.now();
   return cacheCfg;
 }
@@ -129,6 +165,8 @@ const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
          i.inv_categoria as categoria_codigo,
          coalesce(nullif(i.inv_unidad, ''), 'unidad') as unidad,
          pr.__PRECIO__ as precio,
+         pr.__PRECIO_DETAL__ as precio_detal,
+         pr.__PRECIO_MAYOR__ as precio_mayor,
          pr.icp_costoactbolivares as costo_bolivares,
          pr.icp_costoactextranjero as costo_extranjero,
          i.inv_descripciondetallada as descripcion_detallada,
@@ -137,6 +175,8 @@ const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
          i.inv_depositos as usa_depositos,
          i.inv_capacidad as capacidad,
          coalesce(x.existencia, 0) as existencia,
+         coalesce(r.reservado, 0) as reservado,
+         greatest(coalesce(x.existencia, 0) - coalesce(r.reservado, 0), 0) as disponible,
          (i.inv_status is distinct from false) as activo
     from arc_inventario i
     left join arc_categorias c on c.cat_codigo = i.inv_categoria
@@ -145,10 +185,25 @@ const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
       select sum(e.exa_existencia) as existencia
         from arc_existencia_actual e
        where e.exa_codigoproducto = i.inv_codigo
-    ) x on true`;
+    ) x on true
+    left join lateral (
+      select sum(d.dtv_cantidad) as reservado
+        from arc_detalletranvtas d
+        join arc_transacciones t
+          on t.trn_autoincrement = d.dtv_operacion_autoincrement
+         and t.trn_documento = d.dtv_documento
+       where d.dtv_codigo = i.inv_codigo
+         and t.trn_tipo = 10
+         and t.trn_status in (2, 4)
+    ) r on true`;
 
 const sqlProductos = (nivel) =>
-  SQL_PRODUCTOS.replace('__PRECIO__', colPrecio(nivel));
+  SQL_PRODUCTOS.replace('__PRECIO__', colPrecio(nivel))
+    .replace('__PRECIO_DETAL__', colPrecio(1))
+    .replace('__PRECIO_MAYOR__', colPrecio(3));
+
+const preciosEnCero = (filas) =>
+  filas.map((p) => ({ ...p, precio: 0, precio_detal: 0, precio_mayor: 0 }));
 
 const SQL_CLIENTES = `
   select c.cli_id_auto as id,
@@ -314,22 +369,27 @@ export const arcStore = {
         `(i.inv_codigo ilike $${n} or i.inv_descripcion ilike $${n} or i.inv_categoria ilike $${n})`
       );
     }
-    const nivel = nivelValido(lista) ?? (await cfg()).lista;
+    const conf = await cfg();
+    const nivel = nivelValido(lista) ?? conf.lista;
     const { rows } = await q(
       `${sqlProductos(nivel)} where ${where.join(' and ')} order by i.inv_descripcion limit 500`,
       params
     );
-    return rows;
+    return conf.preciosCero ? preciosEnCero(rows) : rows;
   },
   async getProduct(id, lista) {
-    const nivel = nivelValido(lista) ?? (await cfg()).lista;
+    const conf = await cfg();
+    const nivel = nivelValido(lista) ?? conf.lista;
     const { rows } = await q(`${sqlProductos(nivel)} where i.inv_id_auto = $1`, [id]);
-    return rows[0] || null;
+    const producto = rows[0] || null;
+    return producto && conf.preciosCero ? preciosEnCero([producto])[0] : producto;
   },
   async getProductByCodigo(codigo, lista) {
-    const nivel = nivelValido(lista) ?? (await cfg()).lista;
+    const conf = await cfg();
+    const nivel = nivelValido(lista) ?? conf.lista;
     const { rows } = await q(`${sqlProductos(nivel)} where i.inv_codigo = $1`, [codigo]);
-    return rows[0] || null;
+    const producto = rows[0] || null;
+    return producto && conf.preciosCero ? preciosEnCero([producto])[0] : producto;
   },
 
   async listCustomers({ q: term = '' } = {}) {
@@ -445,7 +505,9 @@ export const arcStore = {
   // Precios "especiales" del cliente: solo los productos donde su lista
   // (cli_preciodefecto) difiere de la lista base del pedido.
   async customerPrices(clienteId, lista) {
-    const general = nivelValido(lista) ?? (await cfg()).lista;
+    const conf = await cfg();
+    if (conf.preciosCero) return [];
+    const general = nivelValido(lista) ?? conf.lista;
     const nivel = (await this.nivelDelCliente(clienteId)) ?? general;
     if (nivel === general) return [];
     const clienteCol = colPrecio(nivel);
@@ -480,8 +542,7 @@ export const arcStore = {
 
     const tipoSolicitado = Number(data.tipo);
     const tipoDocumento = tipoSolicitado === 9 ? 9 : 10;
-    const estadoNombre =
-      data.estado || (tipoDocumento === 9 ? 'borrador' : 'enviado');
+    const estadoNombre = data.estado || 'transito';
     const status = aCodigo(estadoNombre);
     const listaUsada = Number(data.lista) || Number(cliente.lista_precio) || 1;
     const tipoPrecio = Math.min(3, Math.max(0, listaUsada - 1));
@@ -540,6 +601,34 @@ export const arcStore = {
         'select coalesce(max(dtv_autoincrement), 0) + 1 as n from arc_detalletranvtas'
       );
       const primerDetalle = Number(seqDetalle.rows[0].n);
+
+      // Los pedidos (tipo 10) no pueden superar la existencia disponible.
+      // La reserva de otros pedidos en pendiente/tránsito descuenta stock.
+      if (tipo === 10) {
+        const cantidades = new Map();
+        lineas.forEach((l) => {
+          const codigo = l.d.codigo;
+          cantidades.set(codigo, (cantidades.get(codigo) || 0) + l.cantidad);
+        });
+        const codigos = [...cantidades.keys()].sort();
+        if (codigos.length) {
+          await c.query(
+            `select inv_codigo from arc_inventario
+              where inv_codigo = any($1) order by inv_codigo for update`,
+            [codigos]
+          );
+        }
+        for (const codigo of codigos) {
+          const disponible = await disponibilidadProducto(c, codigo);
+          if (cantidades.get(codigo) > disponible) {
+            const err = new Error(
+              `El producto ${codigo} solo tiene ${disponible} disponible(s)`
+            );
+            err.status = 400;
+            throw err;
+          }
+        }
+      }
 
       const impuestoPorcent = round2(config.taxRate * 100);
 
@@ -835,25 +924,98 @@ export const arcStore = {
 
   async updateOrderEstado(id, estado) {
     const codigo = aCodigo(estado);
-    const cabecera = await q(
-      'select trn_autoincrement, trn_documento from arc_transacciones where trn_id_auto = $1',
-      [id]
-    );
-    if (!cabecera.rows[0]) return null;
+    const c = await pool.connect();
+    try {
+      await c.query('begin');
+      const cabecera = await c.query(
+        `select trn_autoincrement, trn_documento, trn_tipo, trn_status
+           from arc_transacciones where trn_id_auto = $1 for update`,
+        [id]
+      );
+      const h = cabecera.rows[0];
+      if (!h) {
+        await c.query('rollback');
+        return null;
+      }
 
-    await q(
-      'update arc_transacciones set trn_status = $1, trn_lastupdatedate = now() where trn_id_auto = $2',
-      [codigo, id]
-    );
-    await q(
-      `update arc_detalletranvtas
-          set dtv_status = $1, dtv_lastupdatedate = now()
-        where dtv_operacion_autoincrement = $2 and dtv_documento = $3`,
-      [codigo, cabecera.rows[0].trn_autoincrement, cabecera.rows[0].trn_documento]
-    );
+      // Procesada es final: no se permite volver a otro estado.
+      if (Number(h.trn_status) === 1 && codigo !== 1) {
+        const err = new Error(
+          'El documento ya está procesado y no se puede modificar'
+        );
+        err.status = 409;
+        throw err;
+      }
 
-    const { rows: p } = await q(`${SQL_PEDIDOS} where t.trn_id_auto = $1`, [id]);
-    return p[0] ? mapearPedido(p[0]) : null;
+      // Debitar existencia real solo al procesar un pedido (tipo 10).
+      if (codigo === 1 && Number(h.trn_status) !== 1 && Number(h.trn_tipo) === 10) {
+        const detalles = await c.query(
+          `select dtv_codigo, dtv_cantidad,
+                  coalesce(dtv_depositosource, $3) as deposito
+             from arc_detalletranvtas
+            where dtv_operacion_autoincrement = $1 and dtv_documento = $2
+            order by dtv_linea`,
+          [h.trn_autoincrement, h.trn_documento, config.depositSource]
+        );
+
+        for (const d of detalles.rows) {
+          const cantidad = Number(d.dtv_cantidad) || 0;
+          const disponible = await disponibilidadProducto(c, d.dtv_codigo, {
+            autoincrement: h.trn_autoincrement,
+            documento: h.trn_documento
+          });
+          if (cantidad > disponible) {
+            const err = new Error(
+              `El producto ${d.dtv_codigo} solo tiene ${disponible} disponible(s) para procesar`
+            );
+            err.status = 409;
+            throw err;
+          }
+          const actualizado = await c.query(
+            `update arc_existencia_actual
+                set exa_existencia = exa_existencia - $3,
+                    exa_lastupdatedate = now()
+              where exa_id_auto = (
+                select exa_id_auto
+                  from arc_existencia_actual
+                 where exa_codigoproducto = $1
+                   and exa_codigodeposito = $2
+                 order by exa_existencia desc nulls last
+                 limit 1
+              )
+              returning exa_id_auto`,
+            [d.dtv_codigo, Number(d.deposito) || config.depositSource, cantidad]
+          );
+          if (!actualizado.rowCount) {
+            const err = new Error(
+              `No hay existencia registrada para el producto ${d.dtv_codigo}`
+            );
+            err.status = 409;
+            throw err;
+          }
+        }
+      }
+
+      await c.query(
+        'update arc_transacciones set trn_status = $1, trn_lastupdatedate = now() where trn_id_auto = $2',
+        [codigo, id]
+      );
+      await c.query(
+        `update arc_detalletranvtas
+            set dtv_status = $1, dtv_lastupdatedate = now()
+          where dtv_operacion_autoincrement = $2 and dtv_documento = $3`,
+        [codigo, h.trn_autoincrement, h.trn_documento]
+      );
+      await c.query('commit');
+
+      const { rows: p } = await q(`${SQL_PEDIDOS} where t.trn_id_auto = $1`, [id]);
+      return p[0] ? mapearPedido(p[0]) : null;
+    } catch (err) {
+      await c.query('rollback').catch(() => {});
+      throw err;
+    } finally {
+      c.release();
+    }
   },
 
   async listOrders({ vendedorId = null, q: term = '', estado = '', tipo = null } = {}) {
@@ -1138,6 +1300,10 @@ export const arcStore = {
         total: round2(aNumero(x.total))
       }))
     };
+  },
+
+  async preciosCero() {
+    return (await cfg()).preciosCero;
   },
 
   estados: () => ESTADOS.map((e) => e.nombre)

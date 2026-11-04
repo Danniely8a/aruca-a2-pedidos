@@ -310,6 +310,14 @@ export default function Settings() {
               </select>
             </label>
           </div>
+          <label className="check" style={{ marginTop: 12 }}>
+            <input
+              type="checkbox"
+              checked={!!cfg.precios_cero}
+              onChange={(e) => setCfg({ ...cfg, precios_cero: e.target.checked })}
+            />
+            Forzar precios en cero temporalmente (sin precios)
+          </label>
           <p className="sub" style={{ marginTop: 12 }}>
             {cfg.tipo_descripcion
               ? `Los pedidos montados en la web se guardan como «${cfg.tipo_descripcion}» y toman el número del módulo «${cfg.modulo_correlativo}» de arc_correlatives.`

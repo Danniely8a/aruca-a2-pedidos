@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import { useCart } from '../context/CartContext.jsx';
 
-export default function ProductoBuscador({ onSelect, lista }) {
+export default function ProductoBuscador({ onSelect, lista, tipo = 10 }) {
   const cart = useCart();
   const [q, setQ] = useState('');
   const [items, setItems] = useState([]);
@@ -59,14 +59,18 @@ export default function ProductoBuscador({ onSelect, lista }) {
           )}
           {!loading &&
             items.map((p) => {
-              const sinStock = Number(p.existencia) <= 0;
+              const existencia = Number(p.existencia) || 0;
+              const disponible = Number(p.disponible ?? existencia) || 0;
+              const sinDisponible = tipo === 10 && disponible <= 0;
               const enPedido = cart.items.find((i) => i.producto.id === p.id);
+              const money = (n) =>
+                n == null ? '—' : `${cart.currency}${Number(n).toFixed(2)}`;
               return (
                 <button
                   key={p.id}
                   type="button"
                   className="combo-item"
-                  disabled={sinStock}
+                  disabled={sinDisponible}
                   onClick={() => {
                     onSelect(p);
                     setQ('');
@@ -75,14 +79,17 @@ export default function ProductoBuscador({ onSelect, lista }) {
                 >
                   <strong>
                     {p.codigo} · {p.descripcion}
+                    {Number(p.precio) === 0 && (
+                      <span className="tag tag-precio-cero">Precio 0</span>
+                    )}
                   </strong>
                   <span>
-                    {p.precio != null && Number(p.precio) > 0
-                      ? `${cart.currency}${Number(p.precio).toFixed(2)}`
-                      : 'Sin precio'}
+                    Detal {money(p.precio_detal)} · Mayor {money(p.precio_mayor)}
                     {' · '}
-                    {sinStock ? 'Sin existencia' : `${p.existencia} ${p.unidad}(es)`}
-                    {enPedido ? ` · ${enPedido.cantidad} en el pedido` : ''}
+                    Disp. {disponible} {p.unidad}(es)
+                    {' · '}
+                    Exist. {existencia}
+                    {enPedido ? ` · ${enPedido.cantidad} en el documento` : ''}
                   </span>
                 </button>
               );

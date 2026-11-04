@@ -6,16 +6,27 @@ const STORAGE_KEY = 'a2_cart';
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
-const emptyCart = { cliente: null, precios: {}, items: [], observacion: '', lista: null };
+const emptyCart = {
+  cliente: null,
+  precios: {},
+  items: [],
+  observacion: '',
+  lista: 1,
+  tipo: 10
+};
 
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyCart;
     const parsed = JSON.parse(raw);
+    const lista = [1, 3].includes(Number(parsed.lista)) ? Number(parsed.lista) : 1;
+    const tipo = Number(parsed.tipo) === 9 ? 9 : 10;
     return {
       ...emptyCart,
       ...parsed,
+      lista,
+      tipo,
       precios: parsed.precios || {},
       items: (parsed.items || []).map((item) => ({ ...item, descuento: 0 }))
     };
@@ -28,12 +39,14 @@ export function CartProvider({ children }) {
   const [cart, setCart] = useState(load);
   const [taxRate, setTaxRate] = useState(0.16);
   const [currency, setCurrency] = useState('$');
+  const [preciosCero, setPreciosCero] = useState(false);
 
   useEffect(() => {
     api('/api/health', { auth: false })
       .then((h) => {
         if (typeof h.taxRate === 'number') setTaxRate(h.taxRate);
         if (h.currency) setCurrency(h.currency);
+        setPreciosCero(Boolean(h.preciosCero));
       })
       .catch(() => {});
   }, []);
@@ -76,6 +89,7 @@ export function CartProvider({ children }) {
       ...cart,
       taxRate,
       currency,
+      preciosCero,
       lines,
       subtotal,
       descuento,
@@ -108,6 +122,9 @@ export function CartProvider({ children }) {
           setCart((c) => ({ ...c, cliente, precios: {} }));
         }
       },
+      setTipo(tipo) {
+        setCart((c) => ({ ...c, tipo: Number(tipo) === 9 ? 9 : 10 }));
+      },
       async setLista(lista) {
         const nivel = lista ? Number(lista) : null;
         try {
@@ -116,15 +133,16 @@ export function CartProvider({ children }) {
           );
           const mapa = {};
           (data.items || []).forEach((p) => {
-            mapa[p.id] = p.precio == null ? null : Number(p.precio);
+            mapa[p.id] = p;
           });
           setCart((c) => {
             const items = c.items.map((i) => {
-              if (!(i.producto.id in mapa)) return i;
-              const precio = mapa[i.producto.id];
+              const nuevo = mapa[i.producto.id];
+              if (!nuevo) return i;
+              const precio = Number(nuevo.precio) || 0;
               return {
                 ...i,
-                producto: { ...i.producto, precio },
+                producto: { ...i.producto, ...nuevo },
                 precio
               };
             });
@@ -219,14 +237,15 @@ export function CartProvider({ children }) {
           ...emptyCart,
           cliente: c.cliente,
           precios: c.precios,
-          lista: c.lista
+          lista: c.lista,
+          tipo: c.tipo
         }));
       },
       reset() {
         setCart(emptyCart);
       }
     };
-  }, [cart, taxRate, currency]);
+  }, [cart, taxRate, currency, preciosCero]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

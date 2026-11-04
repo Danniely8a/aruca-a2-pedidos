@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import ClienteSelector from '../components/ClienteSelector.jsx';
 import ProductoBuscador from '../components/ProductoBuscador.jsx';
 
-const ETIQUETA_LISTA = { 3: 'Precio mayor', 4: 'Mayor Bs' };
+const ETIQUETA_LISTA = { 1: 'Detal', 3: 'Mayor' };
 
 const nuevoClienteVacio = {
   nombre: '',
@@ -29,7 +29,7 @@ export default function OrderBuilder() {
   const [nuevo, setNuevo] = useState(nuevoClienteVacio);
   const [creando, setCreando] = useState(false);
   const [errorCliente, setErrorCliente] = useState('');
-  const [tipo, setTipo] = useState(10);
+  const tipo = cart.tipo;
   const esPresupuesto = tipo === 9;
 
   const campo = (name) => ({
@@ -79,14 +79,19 @@ export default function OrderBuilder() {
       setError('Agrega al menos un producto con cantidad mayor a cero.');
       return;
     }
-    const sinPrecio = cart.lines.find(
-      (l) => l.cantidad > 0 && (!l.precio || l.precio <= 0)
-    );
-    if (sinPrecio) {
-      setError(
-        `Indica el precio de "${sinPrecio.producto.descripcion}" antes de enviar.`
+    if (tipo === 10) {
+      const sinDisponible = cart.lines.find(
+        (l) =>
+          l.cantidad > 0 &&
+          l.producto.disponible != null &&
+          l.cantidad > Number(l.producto.disponible)
       );
-      return;
+      if (sinDisponible) {
+        setError(
+          `"${sinDisponible.producto.descripcion}" solo tiene ${sinDisponible.producto.disponible} disponible(s).`
+        );
+        return;
+      }
     }
 
     setEnviando(true);
@@ -110,6 +115,22 @@ export default function OrderBuilder() {
     }
   };
 
+  const agregarProducto = (p) => {
+    if (tipo === 10) {
+      const enCarrito =
+        cart.lines.find((l) => l.producto.id === p.id)?.cantidad || 0;
+      const disponible = Number(p.disponible ?? p.existencia) || 0;
+      if (enCarrito + 1 > disponible) {
+        setError(
+          `"${p.descripcion}" solo tiene ${disponible} disponible(s).`
+        );
+        return;
+      }
+    }
+    setError('');
+    cart.addItem(p);
+  };
+
   return (
     <div className="page order-page">
       <div className="page-head">
@@ -126,14 +147,14 @@ export default function OrderBuilder() {
             <button
               type="button"
               className={`tab ${tipo === 10 ? 'active' : ''}`}
-              onClick={() => setTipo(10)}
+              onClick={() => cart.setTipo(10)}
             >
               Pedido
             </button>
             <button
               type="button"
               className={`tab ${tipo === 9 ? 'active' : ''}`}
-              onClick={() => setTipo(9)}
+              onClick={() => cart.setTipo(9)}
             >
               Presupuesto
             </button>
@@ -143,6 +164,13 @@ export default function OrderBuilder() {
           </Link>
         </div>
       </div>
+
+      {cart.preciosCero && (
+        <div className="alert alert-warn">
+          Precios en cero temporalmente mientras se actualizan las listas. Puedes
+          montar y enviar el documento sin precio.
+        </div>
+      )}
 
       <div className="builder">
         <div className="builder-main">
@@ -277,33 +305,25 @@ export default function OrderBuilder() {
                 <div>
                   <strong>Lista de precios</strong>
                   <span>
-                    {cart.lista
-                      ? `Usando «${ETIQUETA_LISTA[cart.lista] || `lista ${cart.lista}`}» en todo el pedido.`
-                      : 'Usando la lista automática del cliente.'}
+                    Usando precio «{ETIQUETA_LISTA[cart.lista] || 'Detal'}» en todo el
+                    documento.
                   </span>
                 </div>
               </div>
               <div className="tabs">
                 <button
                   type="button"
-                  className={`tab ${!cart.lista ? 'active' : ''}`}
-                  onClick={() => cart.setLista(null)}
+                  className={`tab ${cart.lista === 1 ? 'active' : ''}`}
+                  onClick={() => cart.setLista(1)}
                 >
-                  Automático
+                  Detal
                 </button>
                 <button
                   type="button"
                   className={`tab ${cart.lista === 3 ? 'active' : ''}`}
                   onClick={() => cart.setLista(3)}
                 >
-                  Precio mayor
-                </button>
-                <button
-                  type="button"
-                  className={`tab ${cart.lista === 4 ? 'active' : ''}`}
-                  onClick={() => cart.setLista(4)}
-                >
-                  Mayor Bs
+                  Mayor
                 </button>
               </div>
             </div>
@@ -315,7 +335,11 @@ export default function OrderBuilder() {
               <span className="muted">{cart.lines.length} línea(s)</span>
             </div>
 
-            <ProductoBuscador lista={cart.lista} onSelect={(p) => cart.addItem(p)} />
+            <ProductoBuscador
+              lista={cart.lista}
+              tipo={tipo}
+              onSelect={agregarProducto}
+            />
 
             {cart.lines.length === 0 ? (
               <div className="empty-state">
@@ -329,7 +353,10 @@ export default function OrderBuilder() {
                     <tr>
                       <th>Código</th>
                       <th>Descripción</th>
+                      <th className="right">Detal</th>
+                      <th className="right">Mayor</th>
                       <th className="center">Cantidad</th>
+                      <th className="right">Disponible</th>
                       <th className="right">Precio</th>
                       <th className="right">Total</th>
                       <th></th>
@@ -347,6 +374,14 @@ export default function OrderBuilder() {
                             <span className="tag tag-especial">precio especial</span>
                           )}
                         </td>
+                        <td className="right muted">
+                          {cart.currency}
+                          {Number(l.producto.precio_detal ?? 0).toFixed(2)}
+                        </td>
+                        <td className="right muted">
+                          {cart.currency}
+                          {Number(l.producto.precio_mayor ?? 0).toFixed(2)}
+                        </td>
                         <td className="center">
                           <input
                             className="input input-num"
@@ -357,13 +392,24 @@ export default function OrderBuilder() {
                           />
                         </td>
                         <td className="right">
+                          {l.producto.disponible != null
+                            ? Number(l.producto.disponible)
+                            : '—'}
+                        </td>
+                        <td className="right">
+                          {l.precio === 0 && (
+                            <span className="tag tag-precio-cero">Precio 0</span>
+                          )}
                           <input
-                            className="input input-num input-price"
+                            className={`input input-num input-price ${
+                              l.precio === 0 ? 'input-warn' : ''
+                            }`}
                             type="number"
                             min="0"
                             step="0.01"
                             value={l.precioManual ?? ''}
-                            placeholder="Sin precio"
+                            placeholder="0.00"
+                            disabled={cart.preciosCero}
                             onChange={(e) =>
                               cart.setPrecio(l.producto.id, e.target.value)
                             }
@@ -409,6 +455,22 @@ export default function OrderBuilder() {
                           ✕
                         </button>
                       </div>
+                      <div className="line-card-refs">
+                        <span>
+                          Detal {cart.currency}
+                          {Number(l.producto.precio_detal ?? 0).toFixed(2)}
+                        </span>
+                        <span>
+                          Mayor {cart.currency}
+                          {Number(l.producto.precio_mayor ?? 0).toFixed(2)}
+                        </span>
+                        <span>
+                          Disponible{' '}
+                          {l.producto.disponible != null
+                            ? Number(l.producto.disponible)
+                            : '—'}
+                        </span>
+                      </div>
                       <div className="line-card-grid">
                         <label>
                           <span>Cantidad</span>
@@ -424,14 +486,22 @@ export default function OrderBuilder() {
                         </label>
                         <label>
                           <span>Precio</span>
+                          {l.precio === 0 && (
+                            <span className="tag tag-precio-cero">Precio 0</span>
+                          )}
                           <input
-                            className="input input-num input-price"
+                            className={`input input-num input-price ${
+                              l.precio === 0 ? 'input-warn' : ''
+                            }`}
                             type="number"
                             min="0"
                             step="0.01"
                             value={l.precioManual ?? ''}
-                            placeholder="Sin precio"
-                            onChange={(e) => cart.setPrecio(l.producto.id, e.target.value)}
+                            placeholder="0.00"
+                            disabled={cart.preciosCero}
+                            onChange={(e) =>
+                              cart.setPrecio(l.producto.id, e.target.value)
+                            }
                           />
                         </label>
                       </div>
@@ -472,11 +542,7 @@ export default function OrderBuilder() {
             </div>
             <div className="total-row">
               <span>Lista de precios</span>
-              <span>
-                {cart.lista
-                  ? ETIQUETA_LISTA[cart.lista] || `Lista ${cart.lista}`
-                  : 'Automática'}
-              </span>
+              <span>{ETIQUETA_LISTA[cart.lista] || 'Detal'}</span>
             </div>
             <div className="total-row">
               <span>Subtotal</span>

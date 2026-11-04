@@ -67,7 +67,7 @@ const preciosClientes = [
   { cliente_id: 3, producto_id: 6, precio: 6.5 }
 ];
 
-const estados = ['borrador', 'aprobado', 'facturado', 'enviado', 'rechazado'];
+const estados = ['procesada', 'pendiente', 'eliminado', 'transito', 'anulado'];
 
 let pedidos = [
   {
@@ -76,7 +76,7 @@ let pedidos = [
     cliente_id: 1,
     vendedor_id: 2,
     fecha: new Date(Date.now() - 86400000 * 4).toISOString(),
-    estado: 'facturado',
+    estado: 'procesada',
     observacion: 'Entrega en horario de mañana',
     detalles: [
       { producto_id: 1, cantidad: 50, precio: 1.15, descuento: 0 },
@@ -89,7 +89,7 @@ let pedidos = [
     cliente_id: 3,
     vendedor_id: 3,
     fecha: new Date(Date.now() - 86400000 * 2).toISOString(),
-    estado: 'aprobado',
+    estado: 'pendiente',
     observacion: '',
     detalles: [
       { producto_id: 5, cantidad: 20, precio: 4.75, descuento: 0 },
@@ -102,7 +102,7 @@ let pedidos = [
     cliente_id: 4,
     vendedor_id: 3,
     fecha: new Date(Date.now() - 86400000).toISOString(),
-    estado: 'enviado',
+    estado: 'transito',
     observacion: 'Cliente solicita factura a nombre de la empresa',
     detalles: [{ producto_id: 10, cantidad: 25, precio: 2.6, descuento: 5 }]
   }
@@ -234,7 +234,7 @@ export const memoryStore = {
       numero: `${tipo === 9 ? 'PRE' : 'PED'}-${String(secuenciaPedido).padStart(6, '0')}`,
       fecha: new Date().toISOString(),
       tipo,
-      estado: data.estado || (tipo === 9 ? 'borrador' : 'enviado'),
+      estado: data.estado || 'transito',
       ...data
     };
     pedidos = [order, ...pedidos];
@@ -440,6 +440,8 @@ export const memoryStore = {
       vendedores: ordenar(porVendedor, 'total')
     };
   },
+
+  preciosCero: async () => false,
 
   estados: () => estados,
 

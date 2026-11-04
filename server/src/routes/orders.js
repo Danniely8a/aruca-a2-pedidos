@@ -43,7 +43,7 @@ router.post(
       throw new ApiError(400, 'Tipo de documento no válido (9 o 10)');
     }
     const tipoSel = tipoRaw;
-    const estado = tipoSel === 9 ? 'borrador' : 'enviado';
+    const estado = 'transito';
 
     if (!cliente_id) throw new ApiError(400, 'Debes seleccionar un cliente');
     if (!Array.isArray(items) || items.length === 0) {

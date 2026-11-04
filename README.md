@@ -152,8 +152,10 @@ invalida al guardar). Los endpoints responden `401` sin token y `403` a los vend
 
 - **IVA**: lo calculan los triggers de PostgreSQL sobre la base imponible. `TAX_RATE=0.16`.
 - **Sin descuentos por línea**: los pedidos web usan únicamente el precio de lista seleccionado.
-- **Listas de precios**: en pedidos en dólares (`trn_moneda=2`) se usan las columnas `icp_p01…icp_p06` con sufijo `preciototalext`. `trn_tipoprecio` 0→lista 1, 1→lista 2, 2→lista 3 (Precio mayor) y 3→lista 4 (Mayor Bs). Si el cliente tiene `cli_preciodefecto`, la lista automática usa esa lista.
-- **Estados** (`trn_status`, códigos 1..5): `borrador` 1, `aprobado` 2, `facturado` 3, `enviado` 4 y `rechazado` 5. Los pedidos creados desde la web quedan en **4 (enviado)**. Solo un admin cambia el estado.
+- **Listas de precios**: en documentos en dólares (`trn_moneda=2`) se usan `icp_p01…icp_p06` con sufijo `preciototalext`. La web solo permite **Detal** (lista 1, `trn_tipoprecio=0`) y **Mayor** (lista 3, `trn_tipoprecio=2`). Se muestran ambas columnas de precio en catálogo y pedido.
+- **Estados** (`trn_status`, códigos 1..5): `procesada` 1, `pendiente` 2, `eliminado` 3, `transito` 4 y `anulado` 5. Los pedidos y presupuestos nuevos quedan en **4 (tránsito)**. Procesada es final.
+- **Inventario**: los pedidos (tipo 10) en `pendiente` o `transito` reservan mercancía sin tocar `arc_existencia_actual`; la disponibilidad = existencia real − reservas. Los presupuestos no reservan. No se permiten pedidos que superen la disponibilidad. Al pasar a **procesada** se debita la existencia real.
+- **Precios en cero temporal**: el interruptor `precios_cero` de Configuración fuerza precios e impuestos en 0 en el catálogo y en los triggers, sin modificar las listas de precios.
 - **Números de documento**: desde `arc_correlatives` (`cor_modname='Pedidos'`, configurable en `/configuracion`); si no existe el módulo, genera la secuencia solo.
 - **Escritura transaccional**: cada pedido se inserta con `BEGIN … COMMIT` (cabecera + líneas) y se revierte ante cualquier error.
 - **Triggers oficiales**: `server/sql/triggers.sql` calcula precios, impuestos, costos y totales en PostgreSQL. Se aplican con `npm run db:triggers`.

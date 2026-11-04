@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { isConnected, ensureAppSchema } from './db.js';
-import { mode } from './store/index.js';
+import { mode, store } from './store/index.js';
 import authRoutes from './routes/auth.js';
 import catalogRoutes from './routes/catalog.js';
 import orderRoutes from './routes/orders.js';
@@ -26,13 +26,18 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
+  let preciosCero = false;
+  try {
+    preciosCero = await store.preciosCero();
+  } catch {}
   res.json({
     ok: true,
     mode,
     connected: isConnected,
     taxRate: config.taxRate,
-    currency: config.currency
+    currency: config.currency,
+    preciosCero
   });
 });
 

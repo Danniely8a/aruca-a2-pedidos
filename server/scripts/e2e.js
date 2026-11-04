@@ -208,9 +208,13 @@ async function main() {
     const cambio = await req(`/api/pedidos/${creado.data.pedido.id}/estado`, {
       method: 'PATCH',
       token: tAdmin,
-      body: { estado: 'aprobado' }
+      body: { estado: 'pendiente' }
     });
-    check('admin cambia estado a aprobado', cambio.data.pedido?.estado === 'aprobado', JSON.stringify(cambio.data));
+    check(
+      'admin cambia estado a pendiente',
+      cambio.data.pedido?.estado === 'pendiente',
+      JSON.stringify(cambio.data)
+    );
 
     const bloqueo = await req(`/api/pedidos/${creado.data.pedido.id}/estado`, {
       method: 'PATCH',
@@ -612,7 +616,7 @@ async function main() {
     );
     const bloqueoSync = await req(
       `/api/pedidos/${pedidoLista.data.pedido.id}/estado`,
-      { method: 'PATCH', token: tAdmin, body: { estado: 'aprobado' } }
+      { method: 'PATCH', token: tAdmin, body: { estado: 'pendiente' } }
     );
     check(
       'pedido sincronizado no se puede modificar → 409',
@@ -646,9 +650,9 @@ async function main() {
       JSON.stringify(presupuesto.data)
     );
     check(
-      'presupuesto con tipo 9 y estado borrador',
+      'presupuesto con tipo 9 y estado tránsito',
       Number(presupuesto.data?.pedido?.tipo) === 9 &&
-        presupuesto.data?.pedido?.estado === 'borrador',
+        presupuesto.data?.pedido?.estado === 'transito',
       JSON.stringify(presupuesto.data?.pedido)
     );
 
@@ -659,9 +663,9 @@ async function main() {
     );
     const pc = preCab.rows[0];
     check(
-      'presupuesto en cabecera: tipo 9, estado 1 y pendiente de sincronizar',
+      'presupuesto en cabecera: tipo 9, estado 4 y pendiente de sincronizar',
       Number(pc?.trn_tipo) === 9 &&
-        Number(pc?.trn_status) === 1 &&
+        Number(pc?.trn_status) === 4 &&
         pc?.trn_sync_status === false,
       JSON.stringify(pc)
     );
@@ -701,6 +705,181 @@ async function main() {
       }
     });
     check('tipo de documento inválido → 400', tipoInvalido.status === 400, `=${tipoInvalido.status}`);
+
+    // --- Columna Detal/Mayor y disponibilidad ---------------------------
+    const prodDetal = await req('/api/productos?q=P-1001&lista=1', {
+      token: tAdmin
+    });
+    const pv = prodDetal.data.items.find((x) => x.codigo === 'P-1001');
+    check(
+      'catálogo devuelve Detal, Mayor, existencia y disponible',
+      Number(pv?.precio_detal) === Number(p1.precio) &&
+        Number(pv?.precio_mayor) === Math.round(Number(p1.precio) * 0.9 * 100) / 100 &&
+        Number(pv?.existencia) > 0 &&
+        Number(pv?.disponible) >= 0,
+      JSON.stringify(pv)
+    );
+
+    const disponible = Number(pv?.disponible);
+    const sobreventa = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 10,
+        lista: 1,
+        items: [
+          {
+            producto_id: p1?.id,
+            cantidad: disponible + 1000,
+            precio: Number(p1.precio)
+          }
+        ]
+      }
+    });
+    check(
+      'pedido que supera la disponibilidad → 400',
+      sobreventa.status === 400,
+      `=${sobreventa.status} ${JSON.stringify(sobreventa.data)}`
+    );
+
+    const presupuestoSinStock = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 9,
+        lista: 1,
+        items: [
+          {
+            producto_id: p1?.id,
+            cantidad: disponible + 1000,
+            precio: Number(p1.precio)
+          }
+        ]
+      }
+    });
+    check(
+      'presupuesto no valida existencia → 201',
+      presupuestoSinStock.status === 201,
+      `=${presupuestoSinStock.status}`
+    );
+
+    // --- Debitar existencia al procesar un pedido -----------------------
+    const stockAntes = await pool.query(
+      `select coalesce(sum(exa_existencia), 0) as n
+         from a2_test.arc_existencia_actual
+        where exa_codigoproducto = 'P-1005' and exa_codigodeposito = 1`
+    );
+    const pedidoProcesar = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 10,
+        lista: 1,
+        items: [
+          { producto_id: p5?.id, cantidad: 1, precio: Number(p5.precio) }
+        ]
+      }
+    });
+    check(
+      'crear pedido para procesar → 201',
+      pedidoProcesar.status === 201,
+      JSON.stringify(pedidoProcesar.data)
+    );
+    const procesado = await req(
+      `/api/pedidos/${pedidoProcesar.data.pedido.id}/estado`,
+      { method: 'PATCH', token: tAdmin, body: { estado: 'procesada' } }
+    );
+    check(
+      'marcar pedido como procesada',
+      procesado.status === 200 && procesado.data?.pedido?.estado === 'procesada',
+      JSON.stringify(procesado.data)
+    );
+    const stockDespues = await pool.query(
+      `select coalesce(sum(exa_existencia), 0) as n
+         from a2_test.arc_existencia_actual
+        where exa_codigoproducto = 'P-1005' and exa_codigodeposito = 1`
+    );
+    check(
+      'la existencia real se debitó al procesar',
+      Number(stockAntes.rows[0].n) - Number(stockDespues.rows[0].n) === 1,
+      `antes=${stockAntes.rows[0].n} despues=${stockDespues.rows[0].n}`
+    );
+    const reprocesar = await req(
+      `/api/pedidos/${pedidoProcesar.data.pedido.id}/estado`,
+      { method: 'PATCH', token: tAdmin, body: { estado: 'pendiente' } }
+    );
+    check(
+      'pedido procesado no se puede volver a modificar → 409',
+      reprocesar.status === 409,
+      `=${reprocesar.status}`
+    );
+
+    // --- Interruptor temporal de precios en cero ------------------------
+    const ceroOn = await req('/api/settings/config', {
+      method: 'PUT',
+      token: tAdmin,
+      body: { precios_cero: true }
+    });
+    check(
+      'activar precios en cero',
+      ceroOn.status === 200 && ceroOn.data?.precios_cero === true,
+      JSON.stringify(ceroOn.data)
+    );
+    const prodCero = await req('/api/productos?q=P-1001&lista=1', {
+      token: tAdmin
+    });
+    const pc0 = prodCero.data.items.find((x) => x.codigo === 'P-1001');
+    check(
+      'catálogo con precios en cero',
+      Number(pc0?.precio) === 0 &&
+        Number(pc0?.precio_detal) === 0 &&
+        Number(pc0?.precio_mayor) === 0,
+      JSON.stringify(pc0)
+    );
+    const pedidoCero = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 10,
+        lista: 1,
+        items: [{ producto_id: p1?.id, cantidad: 1, precio: Number(p1.precio) }]
+      }
+    });
+    check(
+      'pedido con precio cero → 201 y total 0',
+      pedidoCero.status === 201 && Number(pedidoCero.data?.totales?.total) === 0,
+      JSON.stringify(pedidoCero.data?.totales)
+    );
+    const detalleCero = await pool.query(
+      `select dtv_preciosindescuento, dtv_preciocondescuento,
+              dtv_montoimpuesto1, dtv_preciodeventa
+         from a2_test.arc_detalletranvtas
+        where dtv_operacion_autoincrement = (
+                select trn_autoincrement from a2_test.arc_transacciones
+                 where trn_id_auto = $1)
+          and dtv_documento = (
+                select trn_documento from a2_test.arc_transacciones
+                 where trn_id_auto = $1)`,
+      [pedidoCero.data.pedido.id]
+    );
+    check(
+      'detalle guardado con precio e impuesto en cero',
+      detalleCero.rows.length === 1 &&
+        Number(detalleCero.rows[0].dtv_preciosindescuento) === 0 &&
+        Number(detalleCero.rows[0].dtv_preciocondescuento) === 0 &&
+        Number(detalleCero.rows[0].dtv_montoimpuesto1) === 0 &&
+        Number(detalleCero.rows[0].dtv_preciodeventa) === 0,
+      JSON.stringify(detalleCero.rows)
+    );
+    await req('/api/settings/config', {
+      method: 'PUT',
+      token: tAdmin,
+      body: { precios_cero: false }
+    });
   } finally {
     servidor.kill();
     await new Promise((r) => setTimeout(r, 500));

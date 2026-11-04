@@ -329,17 +329,19 @@ export const settingsStore = {
       tipo_descripcion: tipoActual ? tipoActual.tip_descripcion : null,
       modulo_correlativo: modulo,
       lista_precios: lista,
+      precios_cero: valores.precios_cero === '1',
       fuentes: {
         tipo_operacion: valores.tipo_operacion_pedidos ? 'configurado' : 'por defecto',
         modulo_correlativo: valores.modulo_correlativo_pedidos ? 'configurado' : 'por defecto',
-        lista_precios: valores.lista_precios ? 'configurado' : 'por defecto'
+        lista_precios: valores.lista_precios ? 'configurado' : 'por defecto',
+        precios_cero: valores.precios_cero ? 'configurado' : 'por defecto'
       },
       tipos: tipos.rows.map((t) => ({ id: Number(t.tip_id), descripcion: t.tip_descripcion })),
       modulos: mods.rows.map((m) => ({ modulo: m.cor_modname, proximo: Number(m.cor_proximo) }))
     };
   },
 
-  async setConfig({ tipo_operacion, modulo_correlativo, lista_precios }) {
+  async setConfig({ tipo_operacion, modulo_correlativo, lista_precios, precios_cero }) {
     const set = async (clave, valor) => {
       await q(
         `insert into app_config (clave, valor, actualizado_en)
@@ -368,6 +370,10 @@ export const settingsStore = {
       const n = Math.trunc(Number(lista_precios));
       if (!Number.isFinite(n) || n < 1 || n > 6) throw new Error('La lista de precios debe estar entre 1 y 6');
       await set('lista_precios', n);
+    }
+
+    if (precios_cero !== undefined) {
+      await set('precios_cero', precios_cero ? 1 : 0);
     }
 
     const { invalidarConfigCache } = await import('./arc.js');
