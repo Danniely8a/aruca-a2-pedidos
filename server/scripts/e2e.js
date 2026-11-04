@@ -159,6 +159,33 @@ async function main() {
     const cli1 = await req(`/api/clientes/${cli?.id}`, { token: tAdmin });
     check('detalle cliente', cli1.data.cliente?.nombre === 'Almacén El Progreso', JSON.stringify(cli1.data.cliente));
 
+    const cli3 = clientes.data.items.find((x) => x.codigo === 'C-0003');
+    const propiosCarlos = await req('/api/clientes', { token: tCarlos });
+    check(
+      'vendedor solo ve sus propios clientes',
+      propiosCarlos.data.total === 3 &&
+        (propiosCarlos.data.items || []).every((x) =>
+          ['C-0001', 'C-0002', 'C-0005'].includes(x.codigo)
+        ),
+      JSON.stringify(propiosCarlos.data.items?.map((x) => x.codigo))
+    );
+    const clienteAjeno = await req(`/api/clientes/${cli3?.id}`, {
+      token: tCarlos
+    });
+    check(
+      'vendedor no puede ver el cliente de otro vendedor → 404',
+      clienteAjeno.status === 404,
+      `=${clienteAjeno.status}`
+    );
+    const clientePropio = await req(`/api/clientes/${cli?.id}`, {
+      token: tCarlos
+    });
+    check(
+      'vendedor puede ver su propio cliente → 200',
+      clientePropio.status === 200,
+      `=${clientePropio.status}`
+    );
+
     const precioCat = Number(p1?.precio);
     const precio = Number.isFinite(precioCat) && precioCat > 0 ? precioCat : 150;
     check('producto con precio de lista', Number.isFinite(precioCat) && precioCat > 0, `=${p1?.precio}`);
@@ -280,7 +307,7 @@ async function main() {
       method: 'POST',
       token: maria.data.token,
       body: {
-        cliente_id: cli?.id,
+        cliente_id: cli3?.id,
         items: [{ producto_id: p1?.id, cantidad: 1, descuento: 0, precio }]
       }
     });

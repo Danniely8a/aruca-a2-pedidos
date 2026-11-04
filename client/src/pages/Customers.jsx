@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Customers() {
+  const { user } = useAuth();
   const cart = useCart();
   const toast = useToast();
   const navigate = useNavigate();
@@ -56,7 +58,11 @@ export default function Customers() {
       <div className="page-head">
         <div>
           <h1>Clientes</h1>
-          <p className="muted">Fichas y listas de precios negociadas</p>
+          <p className="muted">
+            {user?.rol === 'admin'
+              ? 'Fichas y listas de precios negociadas'
+              : 'Solo tus clientes asignados'}
+          </p>
         </div>
       </div>
 

@@ -50,7 +50,8 @@ router.post(
       throw new ApiError(400, 'El pedido debe tener al menos un producto');
     }
 
-    const cliente = await store.getCustomer(cliente_id);
+    const vendedorCliente = req.user.rol === 'admin' ? null : req.user.id;
+    const cliente = await store.getCustomer(cliente_id, vendedorCliente);
     if (!cliente || cliente.activo === false) {
       throw new ApiError(404, 'Cliente no encontrado o inactivo');
     }

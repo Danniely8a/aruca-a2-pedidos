@@ -392,9 +392,15 @@ export const arcStore = {
     return producto && conf.preciosCero ? preciosEnCero([producto])[0] : producto;
   },
 
-  async listCustomers({ q: term = '' } = {}) {
+  async listCustomers({ q: term = '', vendedorId = null } = {}) {
     const params = [];
     const where = ['c.cli_status is distinct from false'];
+    if (vendedorId) {
+      const codigo = await codigoVendedorPorUsuario(vendedorId);
+      if (!codigo) return [];
+      params.push(codigo);
+      where.push(`c.cli_vendedor = $${params.length}`);
+    }
     if (term) {
       params.push(`%${term}%`);
       const n = params.length;
@@ -409,7 +415,21 @@ export const arcStore = {
     );
     return rows;
   },
-  async getCustomer(id) {
+  async getCustomer(id, vendedorId = null) {
+    if (vendedorId) {
+      const codigo = await codigoVendedorPorUsuario(vendedorId);
+      if (!codigo) return null;
+      const { rows } = await q(
+        `${SQL_CLIENTES} where c.cli_id_auto = $1 and c.cli_vendedor = $2`,
+        [id, codigo]
+      );
+      if (rows[0]) return rows[0];
+      const porCodigo = await q(
+        `${SQL_CLIENTES} where c.cli_codigo = $1 and c.cli_vendedor = $2`,
+        [id, codigo]
+      );
+      return porCodigo.rows[0] || null;
+    }
     const { rows } = await q(`${SQL_CLIENTES} where c.cli_id_auto = $1`, [id]);
     if (rows[0]) return rows[0];
     const porCodigo = await q(`${SQL_CLIENTES} where c.cli_codigo = $1`, [id]);

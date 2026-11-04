@@ -26,7 +26,8 @@ router.get(
   '/clientes',
   asyncHandler(async (req, res) => {
     const { q = '' } = req.query;
-    const items = await store.listCustomers({ q });
+    const vendedorId = req.user.rol === 'admin' ? null : req.user.id;
+    const items = await store.listCustomers({ q, vendedorId });
     res.json({ items, total: items.length });
   })
 );
@@ -59,7 +60,7 @@ router.post(
 
     const existente = await store.findCustomerByRif(rif);
     if (existente) {
-      throw new ApiError(409, `Ya existe un cliente con el RIF ${rif} (${existente.nombre})`);
+      throw new ApiError(409, 'Ya existe un cliente con ese RIF');
     }
 
     const cliente = await store.createCustomer({
@@ -81,7 +82,8 @@ router.post(
 router.get(
   '/clientes/:id',
   asyncHandler(async (req, res) => {
-    const cliente = await store.getCustomer(req.params.id);
+    const vendedorId = req.user.rol === 'admin' ? null : req.user.id;
+    const cliente = await store.getCustomer(req.params.id, vendedorId);
     if (!cliente) throw new ApiError(404, 'Cliente no encontrado');
 
     // Si el vendedor elige una lista manual (precio mayor / mayor Bs), esa

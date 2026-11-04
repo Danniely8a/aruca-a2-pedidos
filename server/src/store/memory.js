@@ -168,11 +168,12 @@ export const memoryStore = {
     return p ? conPrecioLista(p, lista) : null;
   },
 
-  listCustomers: async ({ q = '' } = {}) => {
+  listCustomers: async ({ q = '', vendedorId = null } = {}) => {
     const term = q.trim().toLowerCase();
     return clientes.filter(
       (c) =>
         c.activo &&
+        (!vendedorId || c.vendedor_id === Number(vendedorId)) &&
         (!term ||
           c.nombre.toLowerCase().includes(term) ||
           c.codigo.toLowerCase().includes(term) ||
@@ -180,7 +181,12 @@ export const memoryStore = {
           c.ciudad.toLowerCase().includes(term))
     );
   },
-  getCustomer: async (id) => byId(clientes, id) || null,
+  getCustomer: async (id, vendedorId = null) => {
+    const cliente = byId(clientes, id);
+    if (!cliente) return null;
+    if (vendedorId && cliente.vendedor_id !== Number(vendedorId)) return null;
+    return cliente;
+  },
   getCompany: async () => ({
     id: 1,
     codigo: 'ARUCA',
