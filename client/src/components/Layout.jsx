@@ -14,14 +14,14 @@ export default function Layout() {
   const [open, setOpen] = useState(false);
 
   const NAV = [
-    { to: '/', label: 'Inicio', icon: '◈' },
-    { to: '/pedido', label: 'Montar documento', icon: '＋' },
-    { to: '/productos', label: 'Productos', icon: '▦' },
-    { to: '/clientes', label: 'Clientes', icon: '☺' },
-    { to: '/pedidos', label: 'Historial', icon: '≣' },
-    { to: '/reportes', label: 'Reportes', icon: '▥' },
+    { to: '/', label: 'Inicio', short: 'Inicio', icon: '◈' },
+    { to: '/pedido', label: 'Montar documento', short: 'Montar', icon: '＋' },
+    { to: '/productos', label: 'Productos', short: 'Productos', icon: '▦' },
+    { to: '/clientes', label: 'Clientes', short: 'Clientes', icon: '☺' },
+    { to: '/pedidos', label: 'Historial', short: 'Historial', icon: '≣' },
+    { to: '/reportes', label: 'Reportes', short: 'Reportes', icon: '▥' },
     ...(user?.rol === 'admin'
-      ? [{ to: '/configuracion', label: 'Configuración', icon: '⚙' }]
+      ? [{ to: '/configuracion', label: 'Configuración', short: 'Config.', icon: '⚙' }]
       : [])
   ];
 
@@ -96,6 +96,26 @@ export default function Layout() {
 
         <Footer />
       </div>
+
+      <nav className="mobile-nav" aria-label="Menú principal">
+        {NAV.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) =>
+              `mobile-nav-link ${isActive ? 'active' : ''}`
+            }
+            onClick={() => setOpen(false)}
+          >
+            <span className="mobile-nav-icon">{item.icon}</span>
+            <span>{item.short || item.label}</span>
+            {item.to === '/pedido' && cart.count > 0 && (
+              <span className="mobile-nav-badge">{cart.count}</span>
+            )}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

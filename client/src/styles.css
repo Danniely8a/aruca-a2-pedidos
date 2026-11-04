@@ -1529,7 +1529,8 @@ p {
   text-align: center;
 }
 .mobile-lines,
-.mobile-order-bar {
+.mobile-order-bar,
+.mobile-nav {
   display: none;
 }
 
@@ -1567,8 +1568,67 @@ p {
   .sidebar.is-open {
     transform: translateX(0);
   }
+  .backdrop {
+    z-index: 49;
+  }
   .content {
-    padding: 18px 14px;
+    padding: 18px 14px calc(78px + env(safe-area-inset-bottom));
+  }
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 48;
+    gap: 2px;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: #fff;
+    border-top: 1px solid var(--borde);
+    box-shadow: 0 -8px 24px rgba(16, 32, 64, 0.12);
+    overflow-x: auto;
+  }
+  .mobile-nav-link {
+    position: relative;
+    flex: 1 0 50px;
+    min-width: 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 3px;
+    border-radius: 10px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.6rem;
+    font-weight: 600;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    transition: 0.16s ease;
+  }
+  .mobile-nav-link.active {
+    color: var(--azul);
+    background: #eef3ff;
+  }
+  .mobile-nav-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+  .mobile-nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--azul-claro);
+    color: #fff;
+    font-size: 0.6rem;
+    line-height: 15px;
+    font-weight: 700;
   }
   .topbar {
     padding: 0 14px;
@@ -1603,7 +1663,7 @@ p {
 
   /* Montar pedido en móvil */
   .order-page {
-    padding-bottom: 112px;
+    padding-bottom: calc(172px + env(safe-area-inset-bottom));
   }
   .input {
     font-size: 16px;
@@ -1702,11 +1762,11 @@ p {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom));
     z-index: 45;
     background: #fff;
     border-top: 1px solid var(--borde);
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    padding: 10px 14px;
     box-shadow: 0 -10px 30px rgba(16, 32, 64, 0.12);
   }
   .mobile-order-bar-info {
