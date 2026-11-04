@@ -233,8 +233,9 @@ export const settingsStore = {
     const { rows } = await q(
       `insert into arc_users
          (usr_codigo, usr_login, usr_descripcion, usr_emailusuario, usr_rol, usr_status,
-          usr_emp_idauto, usr_fechacreacion, usr_fechasistema, usr_namemachine, usr_usercreator)
-       values ($1,$2,$3,$4,$5,$6,$7, now(), now(), 'A2-WEB', $8)
+          usr_emp_idauto, usr_auth_id, usr_fechacreacion, usr_fechasistema,
+          usr_namemachine, usr_usercreator)
+       values ($1,$2,$3,$4,$5,$6,$7, gen_random_uuid(), now(), now(), 'A2-WEB', $8)
        returning usr_idauto`,
       [
         cod,

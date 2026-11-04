@@ -454,6 +454,15 @@ async function main() {
       }
     });
     check('crear usuario', userNuevo.status === 200, `=${userNuevo.status} ${JSON.stringify(userNuevo.data).slice(0, 80)}`);
+    const authNuevo = await pool.query(
+      'select usr_auth_id from a2_test.arc_users where usr_idauto = $1',
+      [userNuevo.data]
+    );
+    check(
+      'usuario nuevo con usr_auth_id',
+      Boolean(authNuevo.rows[0]?.usr_auth_id),
+      `=${authNuevo.rows[0]?.usr_auth_id}`
+    );
 
     const loginNuevo = await req('/api/auth/login', {
       method: 'POST',
