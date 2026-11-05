@@ -253,6 +253,14 @@ async function main() {
     const dash = await req('/api/dashboard', { token: tAdmin });
     check('dashboard con conteos', Number(dash.data.clientes) === 6, JSON.stringify(dash.data));
 
+    const dashVendedor = await req('/api/dashboard', { token: tCarlos });
+    check(
+      'dashboard del vendedor con sus propios clientes',
+      Number(dashVendedor.data.clientes) === 3 &&
+        Number(dashVendedor.data.pedidos_mes) === 1,
+      JSON.stringify(dashVendedor.data)
+    );
+
     const pedidoA2 = await pool.query(
       'select trn_documento, trn_status, trn_rifcliente, trn_vendedorasignado, trn_totalneto from a2_test.arc_transacciones'
     );
