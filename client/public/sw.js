@@ -1,4 +1,4 @@
-const CACHE = 'a2-pedidos-v1';
+const CACHE = 'a2-pedidos-v2';
 
 const PRECACHE = [
   '/',
@@ -44,11 +44,24 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put('/index.html', copy));
-          return res;
+          if (res.ok) {
+            caches.open(CACHE).then((cache) => cache.put('/index.html', res.clone()));
+            return res;
+          }
+          return caches.match('/index.html').then((cached) => cached || res);
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() =>
+          caches
+            .match('/index.html')
+            .then(
+              (cached) =>
+                cached ||
+                new Response('Sin conexión', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+                })
+            )
+        )
     );
     return;
   }

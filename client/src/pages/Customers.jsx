@@ -54,7 +54,7 @@ export default function Customers() {
   };
 
   return (
-    <div className="page">
+    <div className="page customers-page">
       <div className="page-head">
         <div>
           <h1>Clientes</h1>
@@ -81,48 +81,93 @@ export default function Customers() {
         <p className="empty">No hay clientes para esa búsqueda.</p>
       )}
 
-      <div className="table-wrap card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Cliente</th>
-              <th>Ciudad</th>
-              <th>Vendedor</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+      {!loading && items.length > 0 && (
+        <>
+          <p className="clients-count">
+            {items.length} cliente{items.length === 1 ? '' : 's'}
+          </p>
+
+          <div className="table-wrap card clients-desktop">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Cliente</th>
+                  <th>Ciudad</th>
+                  <th>Vendedor</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.codigo}</td>
+                    <td>
+                      <strong className="link" onClick={() => abrir(c)}>
+                        {c.nombre}
+                      </strong>
+                      <div className="sub">{c.rif}</div>
+                    </td>
+                    <td>{c.ciudad}</td>
+                    <td>{c.vendedor_nombre || '—'}</td>
+                    <td className="right">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => abrir(c)}
+                      >
+                        Ver ficha
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => montarCon(c)}
+                      >
+                        Montar documento
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="clients-mobile">
             {items.map((c) => (
-              <tr key={c.id}>
-                <td>{c.codigo}</td>
-                <td>
-                  <strong
-                    className="link"
+              <article className="client-card" key={c.id}>
+                <div className="client-card-head">
+                  <div>
+                    <strong className="link" onClick={() => abrir(c)}>
+                      {c.nombre}
+                    </strong>
+                    <span>
+                      {c.codigo} · {c.rif}
+                    </span>
+                  </div>
+                  {c.ciudad && <span className="tag">{c.ciudad}</span>}
+                </div>
+                <div className="client-card-meta">
+                  <span>
+                    Vendedor: <strong>{c.vendedor_nombre || '—'}</strong>
+                  </span>
+                </div>
+                <div className="client-card-actions">
+                  <button
+                    className="btn btn-ghost btn-sm"
                     onClick={() => abrir(c)}
                   >
-                    {c.nombre}
-                  </strong>
-                  <div className="sub">{c.rif}</div>
-                </td>
-                <td>{c.ciudad}</td>
-                <td>{c.vendedor_nombre || '—'}</td>
-                <td className="right">
-                  <button className="btn btn-ghost btn-sm" onClick={() => abrir(c)}>
                     Ver ficha
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => montarCon(c)}
                   >
-                    Montar pedido
+                    Montar documento
                   </button>
-                </td>
-              </tr>
+                </div>
+              </article>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </>
+      )}
 
       {detalle && (
         <div className="modal-backdrop" onClick={() => setDetalle(null)}>

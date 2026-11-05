@@ -25,76 +25,111 @@ export default function Dashboard() {
   }, [user]);
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
+    <div className="page dashboard-page">
+      <section className="dashboard-hero">
+        <div className="hero-copy">
+          <span className="hero-kicker">Panel comercial</span>
           <h1>Hola, {user.nombre.split(' ')[0]}</h1>
-          <p className="muted">Resumen de tu operación comercial</p>
+          <p>Este es el resumen de tu operación y tus accesos rápidos.</p>
+          <div className="hero-actions">
+            <button
+              className="btn btn-light"
+              onClick={() => navigate('/pedido')}
+            >
+              Nuevo documento
+            </button>
+            <Link className="btn btn-hero-ghost" to="/productos">
+              Ver catálogo
+            </Link>
+          </div>
         </div>
-        <div className="page-actions">
+
+        <div className="hero-side">
+          <div className="hero-cart">
+            <span>Documento en curso</span>
+            <strong>
+              {cart.count} artículo{cart.count === 1 ? '' : 's'}
+            </strong>
+            <span>{money(cart.total, cart.currency)}</span>
+          </div>
           <InstallApp />
-          <button className="btn btn-primary" onClick={() => navigate('/pedido')}>
-            Montar nuevo documento
-          </button>
         </div>
-      </div>
+      </section>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="cards">
-        <div className="card stat">
-          <span>Pedidos este mes</span>
-          <strong>{stats?.pedidos_mes ?? '—'}</strong>
+      <div className="cards dashboard-stats">
+        <div className="card stat stat-card">
+          <span className="stat-icon stat-icon-blue">≣</span>
+          <div>
+            <span>Pedidos este mes</span>
+            <strong>{stats?.pedidos_mes ?? '—'}</strong>
+          </div>
         </div>
-        <div className="card stat">
-          <span>Monto del mes</span>
-          <strong>{stats ? money(stats.monto_mes, cart.currency) : '—'}</strong>
+        <div className="card stat stat-card">
+          <span className="stat-icon stat-icon-green">$</span>
+          <div>
+            <span>Monto del mes</span>
+            <strong>
+              {stats ? money(stats.monto_mes, cart.currency) : '—'}
+            </strong>
+          </div>
         </div>
-        <div className="card stat">
-          <span>Clientes</span>
-          <strong>{stats?.clientes ?? '—'}</strong>
+        <div className="card stat stat-card">
+          <span className="stat-icon stat-icon-amber">☺</span>
+          <div>
+            <span>Clientes</span>
+            <strong>{stats?.clientes ?? '—'}</strong>
+          </div>
         </div>
-        <div className="card stat">
-          <span>Productos</span>
-          <strong>{stats?.productos ?? '—'}</strong>
+        <div className="card stat stat-card">
+          <span className="stat-icon stat-icon-violet">▦</span>
+          <div>
+            <span>Productos</span>
+            <strong>{stats?.productos ?? '—'}</strong>
+          </div>
         </div>
       </div>
 
-      <div className="grid-2">
+      <div className="grid-2 dashboard-grid">
         <section className="card">
           <div className="card-head">
-            <h2>Pedidos recientes</h2>
+            <div>
+              <h2>Actividad reciente</h2>
+              <p className="muted">Últimos documentos montados</p>
+            </div>
             <Link to="/pedidos" className="link">
-              Ver historial →
+              Ver todo →
             </Link>
           </div>
+
           {recientes.length === 0 ? (
-            <p className="empty">Aún no tienes pedidos registrados.</p>
+            <p className="empty">Aún no tienes documentos registrados.</p>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Número</th>
-                  <th>Cliente</th>
-                  <th>Estado</th>
-                  <th className="right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recientes.map((p) => (
-                  <tr key={p.id} onClick={() => navigate(`/pedidos/${p.id}`)}>
-                    <td>
-                      <strong>{p.numero}</strong>
-                    </td>
-                    <td>{p.cliente?.nombre}</td>
-                    <td>
-                      <EstadoTag estado={p.estado} />
-                    </td>
-                    <td className="right">{money(p.total, cart.currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="recent-list">
+              {recientes.map((p) => (
+                <button
+                  type="button"
+                  className="recent-item"
+                  key={p.id}
+                  onClick={() => navigate(`/pedidos/${p.id}`)}
+                >
+                  <div className="recent-main">
+                    <strong>{p.numero}</strong>
+                    <span>{p.cliente?.nombre}</span>
+                  </div>
+                  <div className="recent-meta">
+                    <EstadoTag estado={p.estado} />
+                    <span>
+                      {Number(p.tipo) === 9 ? 'Presupuesto' : 'Pedido'}
+                    </span>
+                  </div>
+                  <strong className="recent-total">
+                    {money(p.total, cart.currency)}
+                  </strong>
+                </button>
+              ))}
+            </div>
           )}
         </section>
 
@@ -102,18 +137,34 @@ export default function Dashboard() {
           <div className="card-head">
             <h2>Accesos rápidos</h2>
           </div>
-          <div className="quick">
+          <div className="quick quick-grid">
             <Link className="quick-item" to="/pedido">
-              <strong>Montar documento</strong>
-              <span>Selecciona cliente y agrega productos</span>
+              <span className="quick-icon">＋</span>
+              <div>
+                <strong>Montar documento</strong>
+                <span>Cliente, productos y envío</span>
+              </div>
             </Link>
             <Link className="quick-item" to="/productos">
-              <strong>Catálogo</strong>
-              <span>Busca artículos y añádelos al pedido</span>
+              <span className="quick-icon">▦</span>
+              <div>
+                <strong>Catálogo</strong>
+                <span>Precios, stock y disponibilidad</span>
+              </div>
             </Link>
             <Link className="quick-item" to="/clientes">
-              <strong>Clientes</strong>
-              <span>Consulta fichas y listas de precios</span>
+              <span className="quick-icon">☺</span>
+              <div>
+                <strong>Clientes</strong>
+                <span>Fichas y listas de precios</span>
+              </div>
+            </Link>
+            <Link className="quick-item" to="/reportes">
+              <span className="quick-icon">▥</span>
+              <div>
+                <strong>Reportes</strong>
+                <span>Ventas por periodo</span>
+              </div>
             </Link>
           </div>
         </section>

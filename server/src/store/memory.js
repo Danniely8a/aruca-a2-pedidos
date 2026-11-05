@@ -296,12 +296,15 @@ export const memoryStore = {
       .filter((p) => (Number(p.tipo) || 10) === 10)
       .filter((p) => !vendedorId || p.vendedor_id === Number(vendedorId));
     const delMes = propios.filter((p) => new Date(p.fecha) >= mes);
+    const clientesVisibles = vendedorId
+      ? clientes.filter((c) => c.vendedor_id === Number(vendedorId))
+      : clientes;
     return {
       pedidos_mes: delMes.length,
       monto_mes: round2(
         delMes.reduce((acc, p) => acc + Number(p.total || 0), 0)
       ),
-      clientes: clientes.length,
+      clientes: clientesVisibles.length,
       productos: productos.length,
       vendedores: usuarios.filter((u) => u.rol === 'vendedor').length
     };

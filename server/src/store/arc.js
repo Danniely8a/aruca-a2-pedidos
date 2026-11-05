@@ -1114,13 +1114,18 @@ export const arcStore = {
 
   async stats({ vendedorId = null } = {}) {
     let filtro = '';
+    let clienteFiltro = '';
+    let clienteParams = [];
     const params = [(await cfg()).tipo];
     if (vendedorId) {
-      const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [vendedorId]);
-      const codigo = u.rows[0]?.usr_codigo;
-      if (!codigo) return { pedidos_mes: 0, monto_mes: 0, clientes: 0, productos: 0, vendedores: 0 };
+      const codigo = await codigoVendedorPorUsuario(vendedorId);
+      if (!codigo) {
+        return { pedidos_mes: 0, monto_mes: 0, clientes: 0, productos: 0, vendedores: 0 };
+      }
       params.push(codigo);
-      filtro = 'and trn_vendedorasignado = $2';
+      filtro = `and trn_vendedorasignado = $${params.length}`;
+      clienteParams = [codigo];
+      clienteFiltro = 'and cli_vendedor = $1';
     }
     const [pedidos, clientes, productos, vendedores] = await Promise.all([
       q(
@@ -1129,7 +1134,11 @@ export const arcStore = {
           where trn_tipo = $1 and trn_fechaemision >= date_trunc('month', now()) ${filtro}`,
         params
       ),
-      q('select count(*) as n from arc_clientes where cli_status is distinct from false'),
+      q(
+        `select count(*) as n from arc_clientes
+          where cli_status is distinct from false ${clienteFiltro}`,
+        clienteParams
+      ),
       q('select count(*) as n from arc_inventario where inv_status is distinct from false'),
       q('select count(*) as n from arc_users where usr_status is distinct from false')
     ]);

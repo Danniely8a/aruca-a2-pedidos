@@ -5,6 +5,91 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { EstadoTag } from './Dashboard.jsx';
 
+function HistoryBlock({ titulo, items, currency, navigate }) {
+  if (!items.length) return null;
+  const money = (n) => `${currency}${Number(n || 0).toFixed(2)}`;
+  const fecha = (f) =>
+    new Date(f).toLocaleString('es-VE', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+  return (
+    <section className="card history-section">
+      <div className="card-head">
+        <div>
+          <h2>{titulo}</h2>
+          <p className="muted">
+            {items.length} documento{items.length === 1 ? '' : 's'}
+          </p>
+        </div>
+      </div>
+
+      <div className="table-wrap history-desktop">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Vendedor</th>
+              <th>Estado</th>
+              <th className="right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((p) => (
+              <tr
+                key={p.id}
+                className="row-click"
+                onClick={() => navigate(`/pedidos/${p.id}`)}
+              >
+                <td>
+                  <strong>{p.numero}</strong>
+                </td>
+                <td>{fecha(p.fecha)}</td>
+                <td>{p.cliente?.nombre}</td>
+                <td>{p.vendedor?.nombre}</td>
+                <td>
+                  <EstadoTag estado={p.estado} />
+                </td>
+                <td className="right">
+                  <strong>{money(p.total)}</strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="history-mobile">
+        {items.map((p) => (
+          <button
+            type="button"
+            className="history-card"
+            key={p.id}
+            onClick={() => navigate(`/pedidos/${p.id}`)}
+          >
+            <div className="history-card-top">
+              <strong>{p.numero}</strong>
+              <EstadoTag estado={p.estado} />
+            </div>
+            <div className="history-card-client">{p.cliente?.nombre}</div>
+            <div className="history-card-meta">
+              <span>{fecha(p.fecha)}</span>
+              <span>{p.vendedor?.nombre}</span>
+            </div>
+            <div className="history-card-foot">
+              <span className="tag">{titulo.slice(0, -1)}</span>
+              <strong>{money(p.total)}</strong>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function OrderHistory() {
   const { user } = useAuth();
   const cart = useCart();
@@ -44,6 +129,9 @@ export default function OrderHistory() {
     };
   }, [q, estado, tipo, todos, user]);
 
+  const pedidos = items.filter((p) => Number(p.tipo) === 10);
+  const presupuestos = items.filter((p) => Number(p.tipo) === 9);
+
   return (
     <div className="page">
       <div className="page-head">
@@ -69,7 +157,11 @@ export default function OrderHistory() {
           <option value="10">Pedidos</option>
           <option value="9">Presupuestos</option>
         </select>
-        <select className="input select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+        <select
+          className="input select"
+          value={estado}
+          onChange={(e) => setEstado(e.target.value)}
+        >
           <option value="">Todos los estados</option>
           {estados.map((e) => (
             <option key={e} value={e}>
@@ -79,7 +171,11 @@ export default function OrderHistory() {
         </select>
         {user.rol === 'admin' && (
           <label className="check">
-            <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={todos}
+              onChange={(e) => setTodos(e.target.checked)}
+            />
             Ver documentos de todos los vendedores
           </label>
         )}
@@ -92,47 +188,24 @@ export default function OrderHistory() {
       )}
 
       {!loading && items.length > 0 && (
-        <div className="table-wrap card">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Número</th>
-                <th>Tipo</th>
-                <th>Fecha</th>
-                <th>Cliente</th>
-                <th>Vendedor</th>
-                <th>Estado</th>
-                <th className="right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((p) => (
-                <tr key={p.id} className="row-click" onClick={() => navigate(`/pedidos/${p.id}`)}>
-                  <td>
-                    <strong>{p.numero}</strong>
-                  </td>
-                  <td>
-                    <span className="tag">
-                      {Number(p.tipo) === 9 ? 'Presupuesto' : 'Pedido'}
-                    </span>
-                  </td>
-                  <td>{new Date(p.fecha).toLocaleString('es-VE', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                  <td>{p.cliente?.nombre}</td>
-                  <td>{p.vendedor?.nombre}</td>
-                  <td>
-                    <EstadoTag estado={p.estado} />
-                  </td>
-                  <td className="right">
-                    <strong>
-                      {cart.currency}
-                      {Number(p.total).toFixed(2)}
-                    </strong>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {(tipo === '' || tipo === '10') && (
+            <HistoryBlock
+              titulo="Pedidos"
+              items={pedidos}
+              currency={cart.currency}
+              navigate={navigate}
+            />
+          )}
+          {(tipo === '' || tipo === '9') && (
+            <HistoryBlock
+              titulo="Presupuestos"
+              items={presupuestos}
+              currency={cart.currency}
+              navigate={navigate}
+            />
+          )}
+        </>
       )}
     </div>
   );
