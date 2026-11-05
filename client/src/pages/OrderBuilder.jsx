@@ -175,8 +175,14 @@ export default function OrderBuilder() {
       <div className="builder">
         <div className="builder-main">
           <section className="card">
-            <div className="card-head">
-              <h2>1. Cliente</h2>
+            <div className="step-head">
+              <span className="step-number">1</span>
+              <div className="step-copy">
+                <h2>Cliente</h2>
+                <p className="muted">
+                  Selecciona un cliente existente o registra uno nuevo.
+                </p>
+              </div>
               <div className="tabs">
                 <button
                   type="button"
@@ -285,54 +291,58 @@ export default function OrderBuilder() {
           </section>
 
           <section className="card">
-            <div className="card-head">
-              <h2>2. Moneda</h2>
-              <span className="tag tag-aprobado">USD</span>
-            </div>
-            <div className="moneda-box">
-              <div>
-                <strong>Dólares estadounidenses (USD)</strong>
-                <span>
-                  Moneda que admite el pedido. Los precios se expresan con el símbolo
-                  «{cart.currency}».
-                </span>
+            <div className="step-head">
+              <span className="step-number">2</span>
+              <div className="step-copy">
+                <h2>Condiciones</h2>
+                <p className="muted">Moneda y lista de precios del documento.</p>
               </div>
-              <span className="moneda-symbol">{cart.currency}</span>
             </div>
 
-            <div className="precio-box">
-              <div className="precio-box-head">
-                <div>
-                  <strong>Lista de precios</strong>
-                  <span>
-                    Usando precio «{ETIQUETA_LISTA[cart.lista] || 'Detal'}» en todo el
-                    documento.
-                  </span>
-                </div>
+            <div className="order-conditions">
+              <div className="condition-box">
+                <span>Moneda</span>
+                <strong>USD · {cart.currency}</strong>
+                <small>Dólares estadounidenses</small>
               </div>
-              <div className="tabs">
-                <button
-                  type="button"
-                  className={`tab ${cart.lista === 1 ? 'active' : ''}`}
-                  onClick={() => cart.setLista(1)}
-                >
-                  Detal
-                </button>
-                <button
-                  type="button"
-                  className={`tab ${cart.lista === 3 ? 'active' : ''}`}
-                  onClick={() => cart.setLista(3)}
-                >
-                  Mayor
-                </button>
+              <div className="condition-box">
+                <span>Lista de precios</span>
+                <div className="tabs">
+                  <button
+                    type="button"
+                    className={`tab ${cart.lista === 1 ? 'active' : ''}`}
+                    onClick={() => cart.setLista(1)}
+                  >
+                    Detal
+                  </button>
+                  <button
+                    type="button"
+                    className={`tab ${cart.lista === 3 ? 'active' : ''}`}
+                    onClick={() => cart.setLista(3)}
+                  >
+                    Mayor
+                  </button>
+                </div>
+                <small>
+                  Se aplica «{ETIQUETA_LISTA[cart.lista] || 'Detal'}» a todo el
+                  documento.
+                </small>
               </div>
             </div>
           </section>
 
           <section className="card">
-            <div className="card-head">
-              <h2>3. Productos del pedido</h2>
-              <span className="muted">{cart.lines.length} línea(s)</span>
+            <div className="step-head">
+              <span className="step-number">3</span>
+              <div className="step-copy">
+                <h2>Productos</h2>
+                <p className="muted">
+                  Busca por código o descripción y ajusta cantidades.
+                </p>
+              </div>
+              <span className="step-count">
+                {cart.lines.length} línea{cart.lines.length === 1 ? '' : 's'}
+              </span>
             </div>
 
             <ProductoBuscador
@@ -520,8 +530,14 @@ export default function OrderBuilder() {
           </section>
 
           <section className="card">
-            <div className="card-head">
-              <h2>Observaciones</h2>
+            <div className="step-head">
+              <span className="step-number">4</span>
+              <div className="step-copy">
+                <h2>Observaciones</h2>
+                <p className="muted">
+                  Instrucciones de entrega o referencias para el pedido.
+                </p>
+              </div>
             </div>
             <textarea
               className="input textarea"
@@ -534,8 +550,20 @@ export default function OrderBuilder() {
         </div>
 
         <aside className="builder-side">
-          <div className="card totals">
-            <h2>Resumen</h2>
+          <div className="card totals order-summary">
+            <div className="summary-head">
+              <span className="summary-type">
+                {esPresupuesto ? 'Presupuesto' : 'Pedido'}
+              </span>
+              <h2>Resumen</h2>
+            </div>
+
+            <div className="summary-client">
+              <span>Cliente</span>
+              <strong>{cart.cliente?.nombre || 'Sin cliente'}</strong>
+              {cart.cliente?.rif && <small>{cart.cliente.rif}</small>}
+            </div>
+
             <div className="total-row">
               <span>Moneda</span>
               <span>USD ({cart.currency})</span>
@@ -543,6 +571,10 @@ export default function OrderBuilder() {
             <div className="total-row">
               <span>Lista de precios</span>
               <span>{ETIQUETA_LISTA[cart.lista] || 'Detal'}</span>
+            </div>
+            <div className="total-row">
+              <span>Artículos</span>
+              <span>{cart.count}</span>
             </div>
             <div className="total-row">
               <span>Subtotal</span>

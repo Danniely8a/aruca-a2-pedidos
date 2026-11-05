@@ -1330,6 +1330,142 @@ p {
 .builder-main .card {
   margin-bottom: 16px;
 }
+.builder-side {
+  position: sticky;
+  top: 84px;
+  align-self: start;
+}
+.step-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--azul-claro), var(--azul));
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 6px 14px rgba(13, 56, 124, 0.22);
+}
+.step-copy {
+  flex: 1;
+  min-width: 0;
+}
+.step-copy h2 {
+  font-size: 1.02rem;
+}
+.step-copy p {
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+.step-head > .tabs {
+  margin-left: auto;
+}
+.step-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: var(--azul);
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.order-conditions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.condition-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: #f7f9ff;
+}
+.condition-box > span:first-child {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.condition-box strong {
+  font-size: 1rem;
+  color: var(--azul);
+}
+.condition-box small {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.condition-box .tabs {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.summary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.summary-head h2 {
+  margin-bottom: 0;
+}
+.summary-type {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: var(--azul);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.summary-client {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 13px;
+  margin-bottom: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: #f7f9ff;
+}
+.summary-client > span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.summary-client strong {
+  font-size: 0.9rem;
+}
+.summary-client small {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.table-lines th {
+  white-space: nowrap;
+}
+.table-lines td {
+  vertical-align: middle;
+}
+.table-lines .input-price {
+  width: 100px;
+}
 .totals h2 {
   margin-bottom: 14px;
 }
@@ -2068,6 +2204,9 @@ p {
   .grid-2 {
     grid-template-columns: 1fr;
   }
+  .builder-side {
+    position: static;
+  }
   .login {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr auto;
@@ -2204,6 +2343,15 @@ p {
   /* Montar pedido en móvil */
   .order-page {
     padding-bottom: calc(172px + env(safe-area-inset-bottom));
+  }
+  .step-head {
+    flex-wrap: wrap;
+  }
+  .step-head > .tabs {
+    margin-left: 44px;
+  }
+  .order-conditions {
+    grid-template-columns: 1fr;
   }
   .input {
     font-size: 16px;
