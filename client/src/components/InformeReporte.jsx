@@ -30,6 +30,7 @@ const NOMBRE_GRUPO = { dia: 'Diario', semana: 'Semanal', mes: 'Mensual' };
 export default function InformeReporte({
   datos,
   currency = '$',
+  mask = false,
   agrupacion = 'dia',
   tipo = '10',
   desde,
@@ -57,7 +58,7 @@ export default function InformeReporte({
   const empresa = datos.empresa || {};
   const resumen = datos.resumen || {};
   const serie = datos.series?.[agrupacion] || [];
-  const money = (n) => `${currency}${Number(n || 0).toFixed(2)}`;
+  const money = (n) => `${currency}${Number(mask ? 0 : n || 0).toFixed(2)}`;
   const generado = new Date().toLocaleString('es-VE', {
     dateStyle: 'medium',
     timeStyle: 'short'

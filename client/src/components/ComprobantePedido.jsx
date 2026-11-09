@@ -67,10 +67,11 @@ function fechaPedido(fecha) {
   return d.toLocaleString('es-VE', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-async function crearImagen({ pedido, empresa, currency }) {
+async function crearImagen({ pedido, empresa, currency, mask = false }) {
   const items = pedido?.detalles || [];
   const descX = 136;
   const descW = 400;
+  const m = (n) => money(currency, mask ? 0 : n);
 
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = '13px "Segoe UI", Arial, sans-serif';
@@ -234,9 +235,9 @@ async function crearImagen({ pedido, empresa, currency }) {
 
     ctx.textAlign = 'right';
     ctx.font = '12.5px "Segoe UI", Arial, sans-serif';
-    ctx.fillText(money(currency, item.precio), 700, centro + 4);
+    ctx.fillText(m(item.precio), 700, centro + 4);
     ctx.font = '700 12.5px "Segoe UI", Arial, sans-serif';
-    ctx.fillText(money(currency, item.subtotal), W - M - 12, centro + 4);
+    ctx.fillText(m(item.subtotal), W - M - 12, centro + 4);
     ctx.textAlign = 'left';
 
     ctx.strokeStyle = BORDE;
@@ -258,9 +259,9 @@ async function crearImagen({ pedido, empresa, currency }) {
   ctx.stroke();
 
   const filasTotales = [
-    ['Subtotal', money(currency, pedido?.subtotal)],
-    ['Descuentos', `-${money(currency, pedido?.descuento)}`],
-    ['Impuestos', money(currency, pedido?.impuestos)]
+    ['Subtotal', m(pedido?.subtotal)],
+    ['Descuentos', `-${m(pedido?.descuento)}`],
+    ['Impuestos', m(pedido?.impuestos)]
   ];
   filasTotales.forEach(([etiqueta, valor], i) => {
     const ty = yTotales + 26 + i * 24;
@@ -282,7 +283,7 @@ async function crearImagen({ pedido, empresa, currency }) {
   ctx.fillText('TOTAL', tx + 16, yTotales + 117);
   ctx.textAlign = 'right';
   ctx.font = '700 17px "Segoe UI", Arial, sans-serif';
-  ctx.fillText(money(currency, pedido?.total), tx + tw - 16, yTotales + 118);
+  ctx.fillText(m(pedido?.total), tx + tw - 16, yTotales + 118);
   ctx.textAlign = 'left';
 
   const observacion = String(pedido?.observacion || '').trim();
@@ -321,7 +322,12 @@ async function crearImagen({ pedido, empresa, currency }) {
   return canvas.toDataURL('image/png');
 }
 
-export default function ComprobantePedido({ pedido, empresa, currency = '$' }) {
+export default function ComprobantePedido({
+  pedido,
+  empresa,
+  currency = '$',
+  mask = false
+}) {
   const [imagen, setImagen] = useState('');
   const [error, setError] = useState('');
 
@@ -329,7 +335,7 @@ export default function ComprobantePedido({ pedido, empresa, currency = '$' }) {
     let cancel = false;
     setImagen('');
     setError('');
-    crearImagen({ pedido, empresa, currency })
+    crearImagen({ pedido, empresa, currency, mask })
       .then((url) => {
         if (!cancel) setImagen(url);
       })
@@ -339,7 +345,7 @@ export default function ComprobantePedido({ pedido, empresa, currency = '$' }) {
     return () => {
       cancel = true;
     };
-  }, [pedido, empresa, currency]);
+  }, [pedido, empresa, currency, mask]);
 
   const archivo = `${pedido?.tipo === 9 ? 'presupuesto' : 'pedido'}-${String(
     pedido?.numero || 'a2'

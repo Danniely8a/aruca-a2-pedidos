@@ -34,19 +34,6 @@ begin
     return new;
   end if;
 
-  -- Interruptor temporal: precios en cero sin tocar las listas de precios.
-  if to_regclass('app_config') is not null then
-    if coalesce((select valor from app_config where clave = 'precios_cero'), '0') = '1' then
-      new.dtv_preciosindescuento := 0;
-      new.dtv_preciocondescuento := 0;
-      new.dtv_impuesto1 := 0;
-      new.dtv_montoimpuesto1 := 0;
-      new.dtv_preciodeventa := 0;
-      new.dtv_preciobasecomision := 0;
-      return new;
-    end if;
-  end if;
-
   -- trn_tipoprecio: 0 -> lista 1, 1 -> lista 2, 2 -> lista 3, 3 -> lista 4
   v_lista := least(6, greatest(1, v_tipoprecio + 1));
   v_col := 'icp_p' || lpad(v_lista::text, 2, '0') ||
@@ -183,3 +170,24 @@ drop trigger if exists trg_trn_sync_status on arc_transacciones;
 create trigger trg_trn_sync_status
 before insert on arc_transacciones
 for each row execute function fn_trn_sync_false();
+
+-- ---------------------------------------------------------------------
+-- Prefijo 2026 para los documentos creados desde la web
+-- ---------------------------------------------------------------------
+create or replace function fn_aplicar_prefijo_documento()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.trn_documento is not null
+     and new.trn_documento not like '2026%' then
+    new.trn_documento := '2026' || lpad(new.trn_documento, 6, '0');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_aplicar_prefijo_documento on arc_transacciones;
+create trigger trg_aplicar_prefijo_documento
+before insert on arc_transacciones
+for each row execute function fn_aplicar_prefijo_documento();

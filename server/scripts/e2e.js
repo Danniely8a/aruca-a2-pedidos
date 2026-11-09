@@ -894,8 +894,9 @@ async function main() {
       }
     });
     check(
-      'pedido con precio cero → 201 y total 0',
-      pedidoCero.status === 201 && Number(pedidoCero.data?.totales?.total) === 0,
+      'pedido con pantalla en cero → 201 y precio real guardado',
+      pedidoCero.status === 201 &&
+        Number(pedidoCero.data?.totales?.total) > 0,
       JSON.stringify(pedidoCero.data?.totales)
     );
     const detalleCero = await pool.query(
@@ -911,12 +912,12 @@ async function main() {
       [pedidoCero.data.pedido.id]
     );
     check(
-      'detalle guardado con precio e impuesto en cero',
+      'detalle guardado con precio real aunque la pantalla esté en cero',
       detalleCero.rows.length === 1 &&
-        Number(detalleCero.rows[0].dtv_preciosindescuento) === 0 &&
-        Number(detalleCero.rows[0].dtv_preciocondescuento) === 0 &&
-        Number(detalleCero.rows[0].dtv_montoimpuesto1) === 0 &&
-        Number(detalleCero.rows[0].dtv_preciodeventa) === 0,
+        Number(detalleCero.rows[0].dtv_preciosindescuento) > 0 &&
+        Number(detalleCero.rows[0].dtv_preciocondescuento) > 0 &&
+        Number(detalleCero.rows[0].dtv_montoimpuesto1) > 0 &&
+        Number(detalleCero.rows[0].dtv_preciodeventa) > 0,
       JSON.stringify(detalleCero.rows)
     );
     await req('/api/settings/config', {

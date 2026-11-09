@@ -126,10 +126,13 @@ export default function Reports() {
     else setHasta(valor);
   };
 
-  const money = (n) => `${cart.currency}${Number(n || 0).toFixed(2)}`;
+  const ocultarPrecios = cart.preciosCero && user?.rol !== 'admin';
+  const money = (n) =>
+    `${cart.currency}${Number(ocultarPrecios ? 0 : n || 0).toFixed(2)}`;
+  const valor = (n) => (ocultarPrecios ? 0 : Number(n) || 0);
   const resumen = datos?.resumen;
   const serie = datos?.series?.[agrupacion] || [];
-  const maximo = Math.max(...serie.map((f) => f.total), 1);
+  const maximo = Math.max(...serie.map((f) => valor(f.total)), 1);
   const barras =
     agrupacion === 'dia' ? serie.slice(-30) : agrupacion === 'semana' ? serie.slice(-16) : serie.slice(-12);
 
@@ -263,7 +266,7 @@ export default function Reports() {
                       <div className="report-bar-track">
                         <div
                           className="report-bar-fill"
-                          style={{ height: `${Math.max(4, (f.total / maximo) * 100)}%` }}
+                          style={{ height: `${Math.max(4, (valor(f.total) / maximo) * 100)}%` }}
                           title={`${etiquetaPeriodo(f.periodo, agrupacion)}: ${money(f.total)}`}
                         />
                       </div>
@@ -476,6 +479,7 @@ export default function Reports() {
         <InformeReporte
           datos={datos}
           currency={cart.currency}
+          mask={ocultarPrecios}
           agrupacion={agrupacion}
           tipo={tipo}
           desde={desde}

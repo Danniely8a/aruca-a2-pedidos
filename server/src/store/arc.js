@@ -66,6 +66,7 @@ async function disponibilidadProducto(cliente, codigo, excluir = null) {
         where d.dtv_codigo = $1
           and t.trn_tipo = 10
           and t.trn_status in (2, 4)
+          and t.trn_sync_status = false
           ${filtroExcluir}`,
       params
     )
@@ -150,12 +151,15 @@ async function nextDocumento(cliente, modulo = config.orderModule) {
       'update arc_correlatives set cor_proximo = $1, cor_fechaultimaactualizacion = now() where cor_modname = $2',
       [proximo + 1, modulo]
     );
-    return { numero: pad(proximo), emp: rows[0].cor_emp_codigo };
+    return {
+      numero: `${config.docPrefix}${pad(proximo)}`,
+      emp: rows[0].cor_emp_codigo
+    };
   }
   const { rows: seq } = await cliente.query(
     'select coalesce(max(trn_autoincrement), 0) + 1 as n from arc_transacciones'
   );
-  return { numero: pad(Number(seq[0].n)), emp: null };
+  return { numero: `${config.docPrefix}${pad(Number(seq[0].n))}`, emp: null };
 }
 
 const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
@@ -195,6 +199,7 @@ const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
        where d.dtv_codigo = i.inv_codigo
          and t.trn_tipo = 10
          and t.trn_status in (2, 4)
+         and t.trn_sync_status = false
     ) r on true`;
 
 const sqlProductos = (nivel) =>

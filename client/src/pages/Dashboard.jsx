@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recientes, setRecientes] = useState([]);
   const [error, setError] = useState('');
+  const ocultarPrecios = cart.preciosCero && user.rol !== 'admin';
+  const mostrar = (n) => money(ocultarPrecios ? 0 : n, cart.currency);
 
   useEffect(() => {
     Promise.all([api('/api/dashboard'), api('/api/pedidos')])
@@ -50,7 +52,7 @@ export default function Dashboard() {
             <strong>
               {cart.count} artículo{cart.count === 1 ? '' : 's'}
             </strong>
-            <span>{money(cart.total, cart.currency)}</span>
+            <span>{mostrar(cart.total)}</span>
           </div>
           <InstallApp />
         </div>
@@ -71,7 +73,7 @@ export default function Dashboard() {
           <div>
             <span>Monto del mes</span>
             <strong>
-              {stats ? money(stats.monto_mes, cart.currency) : '—'}
+              {stats ? mostrar(stats.monto_mes) : '—'}
             </strong>
           </div>
         </div>
@@ -125,7 +127,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <strong className="recent-total">
-                    {money(p.total, cart.currency)}
+                    {mostrar(p.total)}
                   </strong>
                 </button>
               ))}

@@ -5,9 +5,10 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { EstadoTag } from './Dashboard.jsx';
 
-function HistoryBlock({ titulo, items, currency, navigate }) {
+function HistoryBlock({ titulo, items, currency, navigate, mask }) {
   if (!items.length) return null;
-  const money = (n) => `${currency}${Number(n || 0).toFixed(2)}`;
+  const money = (n) =>
+    `${currency}${Number(mask ? 0 : n || 0).toFixed(2)}`;
   const fecha = (f) =>
     new Date(f).toLocaleString('es-VE', {
       dateStyle: 'medium',
@@ -131,6 +132,7 @@ export default function OrderHistory() {
 
   const pedidos = items.filter((p) => Number(p.tipo) === 10);
   const presupuestos = items.filter((p) => Number(p.tipo) === 9);
+  const ocultarPrecios = cart.preciosCero && user.rol !== 'admin';
 
   return (
     <div className="page">
@@ -195,6 +197,7 @@ export default function OrderHistory() {
               items={pedidos}
               currency={cart.currency}
               navigate={navigate}
+              mask={ocultarPrecios}
             />
           )}
           {(tipo === '' || tipo === '9') && (
@@ -203,6 +206,7 @@ export default function OrderHistory() {
               items={presupuestos}
               currency={cart.currency}
               navigate={navigate}
+              mask={ocultarPrecios}
             />
           )}
         </>

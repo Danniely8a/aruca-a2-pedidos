@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { post } from '../api/client.js';
+import { api, post } from '../api/client.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ClienteSelector from '../components/ClienteSelector.jsx';
@@ -31,6 +31,20 @@ export default function OrderBuilder() {
   const [errorCliente, setErrorCliente] = useState('');
   const tipo = cart.tipo;
   const esPresupuesto = tipo === 9;
+
+  useEffect(() => {
+    if (!cart.cliente?.id) return;
+    let cancel = false;
+    const query = cart.lista ? `?lista=${cart.lista}` : '';
+    api(`/api/clientes/${cart.cliente.id}${query}`).catch(() => {
+      if (cancel) return;
+      cart.setCliente(null);
+      setError('El cliente seleccionado ya no está disponible. Selecciona otro.');
+    });
+    return () => {
+      cancel = true;
+    };
+  }, []);
 
   const campo = (name) => ({
     value: nuevo[name],

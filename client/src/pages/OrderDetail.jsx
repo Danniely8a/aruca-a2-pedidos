@@ -51,6 +51,9 @@ export default function OrderDetail() {
   const descuento = Number(pedido.descuento);
   const impuestos = Number(pedido.impuestos);
   const total = Number(pedido.total);
+  const ocultarPrecios = cart.preciosCero && user.rol !== 'admin';
+  const mostrar = (n) =>
+    `${cart.currency}${(ocultarPrecios ? 0 : Number(n || 0)).toFixed(2)}`;
 
   return (
     <div className="page">
@@ -75,6 +78,13 @@ export default function OrderDetail() {
           )}
         </div>
       </div>
+
+      {ocultarPrecios && (
+        <div className="alert alert-warn">
+          Los precios se muestran en cero temporalmente mientras se actualizan las
+          listas.
+        </div>
+      )}
 
       <div className="grid-2">
         <section className="card">
@@ -113,31 +123,19 @@ export default function OrderDetail() {
           <h2>Totales</h2>
           <div className="total-row">
             <span>Subtotal</span>
-            <span>
-              {cart.currency}
-              {subtotal.toFixed(2)}
-            </span>
+            <span>{mostrar(subtotal)}</span>
           </div>
           <div className="total-row">
             <span>Descuentos</span>
-            <span className="neg">
-              -{cart.currency}
-              {descuento.toFixed(2)}
-            </span>
+            <span className="neg">-{mostrar(descuento)}</span>
           </div>
           <div className="total-row">
             <span>Impuestos</span>
-            <span>
-              {cart.currency}
-              {impuestos.toFixed(2)}
-            </span>
+            <span>{mostrar(impuestos)}</span>
           </div>
           <div className="total-row total-final">
             <span>Total</span>
-            <span>
-              {cart.currency}
-              {total.toFixed(2)}
-            </span>
+            <span>{mostrar(total)}</span>
           </div>
         </section>
       </div>
@@ -164,17 +162,11 @@ export default function OrderDetail() {
                     <strong>{l.producto?.descripcion}</strong>
                     <div className="sub">{l.producto?.codigo}</div>
                   </td>
-                  <td className="right">
-                    {cart.currency}
-                    {Number(l.precio).toFixed(2)}
-                  </td>
+                  <td className="right">{mostrar(l.precio)}</td>
                   <td className="center">{Number(l.cantidad)}</td>
                   <td className="center">{Number(l.descuento)}%</td>
                   <td className="right">
-                    <strong>
-                      {cart.currency}
-                      {Number(l.subtotal).toFixed(2)}
-                    </strong>
+                    <strong>{mostrar(l.subtotal)}</strong>
                   </td>
                 </tr>
               ))}
@@ -183,7 +175,12 @@ export default function OrderDetail() {
         </div>
       </section>
 
-      <ComprobantePedido pedido={pedido} empresa={empresa} currency={moneda} />
+      <ComprobantePedido
+        pedido={pedido}
+        empresa={empresa}
+        currency={moneda}
+        mask={ocultarPrecios}
+      />
 
       {user.rol === 'admin' && pedido.sync_status === true && (
         <div className="alert alert-info">
