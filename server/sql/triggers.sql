@@ -27,8 +27,7 @@ begin
          coalesce(trn_factorcambio, 1)
     into v_tipoprecio, v_moneda, v_factor
     from arc_transacciones
-   where trn_autoincrement = new.dtv_operacion_autoincrement
-     and trn_documento = new.dtv_documento;
+   where trn_autoincrement = new.dtv_operacion_autoincrement;
 
   if not found then
     return new;
@@ -172,16 +171,20 @@ before insert on arc_transacciones
 for each row execute function fn_trn_sync_false();
 
 -- ---------------------------------------------------------------------
--- Prefijo 2026 para los documentos creados desde la web
+-- Prefijo AAMM (ej. 202611) para los documentos creados desde la web.
+-- El backend solo envía la secuencia; este trigger agrega el prefijo.
 -- ---------------------------------------------------------------------
 create or replace function fn_aplicar_prefijo_documento()
 returns trigger
 language plpgsql
 as $$
+declare
+  v_prefijo varchar(6);
 begin
+  v_prefijo := to_char(current_date, 'YYYYMM');
   if new.trn_documento is not null
-     and new.trn_documento not like '2026%' then
-    new.trn_documento := '2026' || lpad(new.trn_documento, 6, '0');
+     and new.trn_documento not like v_prefijo || '%' then
+    new.trn_documento := v_prefijo || lpad(new.trn_documento, 6, '0');
   end if;
   return new;
 end;
@@ -191,3 +194,33 @@ drop trigger if exists trg_aplicar_prefijo_documento on arc_transacciones;
 create trigger trg_aplicar_prefijo_documento
 before insert on arc_transacciones
 for each row execute function fn_aplicar_prefijo_documento();
+
+-- ---------------------------------------------------------------------
+-- El detalle hereda el documento ya prefijado desde la cabecera
+-- ---------------------------------------------------------------------
+create or replace function fn_heredar_documento_cabecera()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_doc_cabecera varchar(40);
+begin
+  select trn_documento into v_doc_cabecera
+    from arc_transacciones
+   where trn_autoincrement = new.dtv_operacion_autoincrement
+     and trn_tipo = new.dtv_tipooperacion;
+
+  if found then
+    new.dtv_documento := v_doc_cabecera;
+  else
+    new.dtv_documento := to_char(current_date, 'YYYYMM') || lpad(new.dtv_documento, 6, '0');
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_heredar_documento_detalle on arc_detalletranvtas;
+create trigger trg_heredar_documento_detalle
+before insert on arc_detalletranvtas
+for each row execute function fn_heredar_documento_cabecera();

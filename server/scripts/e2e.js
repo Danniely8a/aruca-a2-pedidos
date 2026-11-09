@@ -582,7 +582,7 @@ async function main() {
 
     // --- Mapeo A2 de la cabecera y el detalle ---------------------------
     const mapeo = await pool.query(
-      `select trn_autoincrement, trn_status, trn_moneda, trn_factorcambio,
+      `select trn_autoincrement, trn_documento, trn_status, trn_moneda, trn_factorcambio,
               trn_depositosource, trn_totalitemsinicial, trn_responsable,
               trn_personacontacto, trn_telefonocontacto, trn_tipoprecio,
               trn_serie, trn_machinename, trn_visible, trn_base_autoincrement,
@@ -621,7 +621,7 @@ async function main() {
          from a2_test.arc_detalletranvtas
         where dtv_operacion_autoincrement = $1 and dtv_documento = $2
         order by dtv_linea`,
-      [hm?.trn_autoincrement, pedidoLista.data.pedido.numero]
+      [hm?.trn_autoincrement, hm?.trn_documento]
     );
     const dm = mapeoDetalle.rows[0];
     check(

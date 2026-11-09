@@ -145,6 +145,7 @@ export const memoryStore = {
         u.usuario.toLowerCase() === String(login).toLowerCase() && u.activo
     ) || null,
   getUserById: async (id) => byId(usuarios, id) || null,
+  codigoVendedor: async () => null,
 
   listCategories: async () =>
     [...new Set(productos.map((p) => p.categoria))].sort(),

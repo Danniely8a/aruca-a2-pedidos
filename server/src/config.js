@@ -30,8 +30,6 @@ export const config = {
   orderTipo: int(process.env.A2_TIPO_PEDIDO, 10),
   // Módulo de correlativos en arc_correlatives (si no existe, se genera solo)
   orderModule: process.env.A2_MODULO_PEDIDO || 'Pedidos',
-  // Prefijo del número de documento (ej. 2026 → 2026000017)
-  docPrefix: process.env.A2_PREFIJO_DOCUMENTO || '2026',
   // Lista de precios a usar (1..6) y si el precio ya trae impuestos
   priceLevel: Math.min(6, Math.max(1, int(process.env.A2_LISTA_PRECIO, 1))),
   priceWithTax: process.env.A2_PRECIO_CON_IMPUESTO === '1'

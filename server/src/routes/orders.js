@@ -130,8 +130,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const pedido = await store.getOrder(req.params.id);
     if (!pedido) throw new ApiError(404, 'Pedido no encontrado');
-    if (req.user.rol !== 'admin' && pedido.vendedor_id !== req.user.id) {
-      throw new ApiError(403, 'No tienes acceso a este pedido');
+    if (req.user.rol !== 'admin') {
+      let permitido =
+        pedido.vendedor_id != null && pedido.vendedor_id === req.user.id;
+      if (!permitido && store.codigoVendedor) {
+        const codigo = await store.codigoVendedor(req.user.id);
+        permitido = Boolean(codigo && pedido.vendedor?.codigo === codigo);
+      }
+      if (!permitido) throw new ApiError(403, 'No tienes acceso a este pedido');
     }
     // El comprobante necesita la ficha completa del cliente y los datos de la
     // empresa, no solo lo mínimo que trae el listado de pedidos.

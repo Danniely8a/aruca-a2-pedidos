@@ -151,15 +151,12 @@ async function nextDocumento(cliente, modulo = config.orderModule) {
       'update arc_correlatives set cor_proximo = $1, cor_fechaultimaactualizacion = now() where cor_modname = $2',
       [proximo + 1, modulo]
     );
-    return {
-      numero: `${config.docPrefix}${pad(proximo)}`,
-      emp: rows[0].cor_emp_codigo
-    };
+    return { numero: pad(proximo), emp: rows[0].cor_emp_codigo };
   }
   const { rows: seq } = await cliente.query(
     'select coalesce(max(trn_autoincrement), 0) + 1 as n from arc_transacciones'
   );
-  return { numero: `${config.docPrefix}${pad(Number(seq[0].n))}`, emp: null };
+  return { numero: pad(Number(seq[0].n)), emp: null };
 }
 
 const SQL_PRODUCTOS = `  select i.inv_id_auto as id,
@@ -256,11 +253,10 @@ const SQL_PEDIDOS = `
          c.cli_id_auto as cliente_id,
          c.cli_codigo as cliente_codigo,
          c.cli_descripcion as cliente_nombre,
-         u.usr_idauto as vendedor_id,
-         u.usr_descripcion as vendedor_nombre
+         v.vnd_descripcion as vendedor_nombre
     from arc_transacciones t
     left join arc_clientes c on c.cli_codigo = t.trn_responsable
-    left join arc_users u on u.usr_codigo = t.trn_vendedorasignado`;
+    left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado`;
 
 function mapearPedido(r) {
   return {
@@ -284,9 +280,11 @@ function mapearPedido(r) {
           rif: r.rif
         }
       : { id: null, codigo: null, nombre: 'Cliente no encontrado', rif: r.rif },
-    vendedor: r.vendedor_id
-      ? { id: Number(r.vendedor_id), nombre: r.vendedor_nombre, codigo: r.vendedor_codigo }
-      : { id: null, nombre: r.vendedor_codigo || '—', codigo: r.vendedor_codigo },
+    vendedor: {
+      id: r.vendedor_id ? Number(r.vendedor_id) : null,
+      nombre: r.vendedor_nombre || r.vendedor_codigo || '—',
+      codigo: r.vendedor_codigo
+    },
     vendedor_id: r.vendedor_id ? Number(r.vendedor_id) : null,
     cliente_id: r.cliente_id ? Number(r.cliente_id) : null
   };
@@ -327,6 +325,9 @@ export const arcStore = {
   async getUserById(id) {
     const u = await this.findUserById(id);
     return u;
+  },
+  async codigoVendedor(userId) {
+    return codigoVendedorPorUsuario(userId);
   },
   async findUserById(id) {
     const { rows } = await q(
@@ -913,7 +914,8 @@ export const arcStore = {
       }
 
       const { rows: filasOficiales } = await c.query(
-        `select trn_totalbruto as subtotal,
+        `select trn_documento as numero,
+                trn_totalbruto as subtotal,
                 trn_descuento1monto as descuento,
                 trn_impuesto1monto as impuestos,
                 trn_totalneto as total,
@@ -928,7 +930,7 @@ export const arcStore = {
       await c.query('commit');
       return {
         id: idTrn,
-        numero,
+        numero: o.numero || numero,
         fecha: ahora.toISOString(),
         tipo,
         estado: aEstado(status),
@@ -1055,10 +1057,7 @@ export const arcStore = {
     }
 
     if (vendedorId) {
-      const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [
-        vendedorId
-      ]);
-      const codigo = u.rows[0]?.usr_codigo;
+      const codigo = await codigoVendedorPorUsuario(vendedorId);
       if (!codigo) return [];
       params.push(codigo);
       where.push(`t.trn_vendedorasignado = $${params.length}`);
@@ -1171,10 +1170,7 @@ export const arcStore = {
     }
 
     if (vendedorId) {
-      const u = await q('select usr_codigo from arc_users where usr_idauto = $1', [
-        vendedorId
-      ]);
-      const codigo = u.rows[0]?.usr_codigo;
+      const codigo = await codigoVendedorPorUsuario(vendedorId);
       if (!codigo) {
         return {
           rango: { desde, hasta },
@@ -1273,11 +1269,11 @@ export const arcStore = {
           params
         ),
         q(
-          `select coalesce(u.usr_descripcion, t.trn_vendedorasignado, 'Sin vendedor') as vendedor,
+          `select coalesce(v.vnd_descripcion, t.trn_vendedorasignado, 'Sin vendedor') as vendedor,
                   count(*) as pedidos,
                   coalesce(sum(t.trn_totalneto), 0) as total
              from arc_transacciones t
-             left join arc_users u on u.usr_codigo = t.trn_vendedorasignado
+             left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
             where ${filtro}
             group by 1
             order by total desc`,
