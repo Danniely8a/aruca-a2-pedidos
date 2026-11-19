@@ -925,6 +925,31 @@ async function main() {
       token: tAdmin,
       body: { precios_cero: false }
     });
+
+    const sinExistencia = productos.data.items.find(
+      (x) => Number(x.existencia) === 0 && Number(x.precio) > 0
+    );
+    const pedidoSinExistencia = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        tipo: 10,
+        lista: 1,
+        items: [
+          {
+            producto_id: sinExistencia?.id,
+            cantidad: 1,
+            precio: Number(sinExistencia?.precio)
+          }
+        ]
+      }
+    });
+    check(
+      'pedido con producto sin existencia → 201',
+      Boolean(sinExistencia) && pedidoSinExistencia.status === 201,
+      JSON.stringify(pedidoSinExistencia.data)
+    );
   } finally {
     servidor.kill();
     await new Promise((r) => setTimeout(r, 500));

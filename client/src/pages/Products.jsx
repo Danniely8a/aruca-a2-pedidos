@@ -48,8 +48,9 @@ export default function Products() {
     if (cart.tipo === 10) {
       const enCarrito =
         cart.lines.find((l) => l.producto.id === p.id)?.cantidad || 0;
-      const disponible = Number(p.disponible ?? p.existencia) || 0;
-      if (enCarrito + 1 > disponible) {
+      const existencia = Number(p.existencia) || 0;
+      const disponible = Number(p.disponible ?? existencia) || 0;
+      if (existencia > 0 && enCarrito + 1 > disponible) {
         toast.show(
           `"${p.descripcion}" solo tiene ${disponible} disponible(s)`,
           'error'
@@ -166,7 +167,8 @@ export default function Products() {
         {items.map((p) => {
           const existencia = Number(p.existencia) || 0;
           const disponible = Number(p.disponible ?? existencia) || 0;
-          const sinDisponible = cart.tipo === 10 && disponible <= 0;
+          const sinDisponible =
+            cart.tipo === 10 && existencia > 0 && disponible <= 0;
           const enPedido = cart.items.find((i) => i.producto.id === p.id);
           return (
             <article className="prod card" key={p.id}>

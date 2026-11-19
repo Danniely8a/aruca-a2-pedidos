@@ -61,7 +61,8 @@ export default function ProductoBuscador({ onSelect, lista, tipo = 10 }) {
             items.map((p) => {
               const existencia = Number(p.existencia) || 0;
               const disponible = Number(p.disponible ?? existencia) || 0;
-              const sinDisponible = tipo === 10 && disponible <= 0;
+              const sinDisponible =
+                tipo === 10 && existencia > 0 && disponible <= 0;
               const enPedido = cart.items.find((i) => i.producto.id === p.id);
               const money = (n) =>
                 n == null ? '—' : `${cart.currency}${Number(n).toFixed(2)}`;

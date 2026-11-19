@@ -71,10 +71,12 @@ async function disponibilidadProducto(cliente, codigo, excluir = null) {
       params
     )
   ]);
-  return (
-    Number(existencia.rows[0]?.existencia || 0) -
-    Number(reservado.rows[0]?.reservado || 0)
-  );
+  const existenciaTotal = Number(existencia.rows[0]?.existencia || 0);
+  const reservadoTotal = Number(reservado.rows[0]?.reservado || 0);
+  return {
+    existencia: existenciaTotal,
+    disponible: existenciaTotal - reservadoTotal
+  };
 }
 
 async function factorDolar() {
@@ -645,10 +647,11 @@ export const arcStore = {
           );
         }
         for (const codigo of codigos) {
-          const disponible = await disponibilidadProducto(c, codigo);
-          if (cantidades.get(codigo) > disponible) {
+          const info = await disponibilidadProducto(c, codigo);
+          // Si no hay existencia (0), se permite montar el pedido igualmente.
+          if (info.existencia > 0 && cantidades.get(codigo) > info.disponible) {
             const err = new Error(
-              `El producto ${codigo} solo tiene ${disponible} disponible(s)`
+              `El producto ${codigo} solo tiene ${info.disponible} disponible(s)`
             );
             err.status = 400;
             throw err;
@@ -987,13 +990,13 @@ export const arcStore = {
 
         for (const d of detalles.rows) {
           const cantidad = Number(d.dtv_cantidad) || 0;
-          const disponible = await disponibilidadProducto(c, d.dtv_codigo, {
+          const info = await disponibilidadProducto(c, d.dtv_codigo, {
             autoincrement: h.trn_autoincrement,
             documento: h.trn_documento
           });
-          if (cantidad > disponible) {
+          if (info.existencia > 0 && cantidad > info.disponible) {
             const err = new Error(
-              `El producto ${d.dtv_codigo} solo tiene ${disponible} disponible(s) para procesar`
+              `El producto ${d.dtv_codigo} solo tiene ${info.disponible} disponible(s) para procesar`
             );
             err.status = 409;
             throw err;
