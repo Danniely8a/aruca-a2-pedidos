@@ -191,6 +191,13 @@ export default function OpsOrderDetail() {
               <strong>{pedido.cliente?.codigo || '—'}</strong>
             </div>
             <div>
+              <span>Vendedor</span>
+              <strong>
+                {pedido.vendedor?.nombre || '—'}
+                {pedido.vendedor?.codigo ? ` (${pedido.vendedor.codigo})` : ''}
+              </strong>
+            </div>
+            <div>
               <span>Teléfono</span>
               <strong>{pedido.cliente?.telefono || '—'}</strong>
             </div>

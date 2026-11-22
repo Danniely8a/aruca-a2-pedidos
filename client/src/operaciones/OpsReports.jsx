@@ -158,6 +158,7 @@ export default function OpsReports() {
                 <tr>
                   <th>Documento</th>
                   <th>Cliente</th>
+                  <th>Vendedor</th>
                   <th>Operario</th>
                   <th>Estado</th>
                   <th>Asignado</th>
@@ -175,6 +176,7 @@ export default function OpsReports() {
                       <div className="muted ops-small">{formatFecha(p.fecha)}</div>
                     </td>
                     <td>{p.cliente}</td>
+                    <td>{p.vendedor || '—'}</td>
                     <td>{p.operario}</td>
                     <td>
                       <EstadoOps estado={p.estado} />

@@ -293,6 +293,23 @@ async function main() {
       opsLista.data.items?.some((p) => p.id === creado.data.pedido.id),
       JSON.stringify(opsLista.data.items)
     );
+    const opsPedido = opsLista.data.items?.find(
+      (p) => p.id === creado.data.pedido.id
+    );
+    check(
+      'operaciones muestra vendedor del pedido',
+      Boolean(opsPedido?.vendedor?.nombre),
+      JSON.stringify(opsPedido?.vendedor)
+    );
+    const opsDetalle = await req(
+      `/api/operaciones/pedidos/${creado.data.pedido.id}`,
+      { token: tOps }
+    );
+    check(
+      'detalle de operaciones muestra vendedor',
+      Boolean(opsDetalle.data.pedido?.vendedor?.nombre),
+      JSON.stringify(opsDetalle.data.pedido?.vendedor)
+    );
 
     const asignado = await req(
       `/api/operaciones/pedidos/${creado.data.pedido.id}/asignar`,
@@ -399,6 +416,13 @@ async function main() {
       reporteOps.status === 200 &&
         reporteOps.data.pedidos?.some((p) => p.numero === numero),
       JSON.stringify(reporteOps.data.resumen)
+    );
+    check(
+      'reporte de operaciones muestra vendedor',
+      Boolean(
+        reporteOps.data.pedidos?.find((p) => p.numero === numero)?.vendedor
+      ),
+      JSON.stringify(reporteOps.data.pedidos?.[0])
     );
 
     const cambio = await req(`/api/pedidos/${creado.data.pedido.id}/estado`, {

@@ -225,6 +225,7 @@ export default function OpsOrders() {
                   <th>Documento</th>
                   <th>Fecha</th>
                   <th>Cliente</th>
+                  <th>Vendedor</th>
                   <th>Artículos</th>
                   <th>Operario</th>
                   <th>Estado</th>
@@ -241,7 +242,13 @@ export default function OpsOrders() {
                       </Link>
                     </td>
                     <td>{formatFecha(p.fecha)}</td>
-                    <td>{p.cliente?.nombre}</td>
+                    <td>
+                      {p.cliente?.nombre}
+                      {p.cliente?.codigo && (
+                        <div className="muted ops-small">{p.cliente.codigo}</div>
+                      )}
+                    </td>
+                    <td>{p.vendedor?.nombre || '—'}</td>
                     <td>
                       <strong>{p.items_validados}/{p.items_total}</strong>
                       <div className="muted ops-small">

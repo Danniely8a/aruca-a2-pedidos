@@ -120,6 +120,7 @@ export default function OpsHome() {
                   <tr>
                     <th>Documento</th>
                     <th>Cliente</th>
+                    <th>Vendedor</th>
                     <th>Estado</th>
                     {esJefe && <th>Operario</th>}
                     <th>Tiempo</th>
@@ -134,7 +135,13 @@ export default function OpsHome() {
                         </Link>
                         <div className="muted ops-small">{formatFecha(p.fecha)}</div>
                       </td>
-                      <td>{p.cliente?.nombre}</td>
+                      <td>
+                        {p.cliente?.nombre}
+                        {p.cliente?.codigo && (
+                          <div className="muted ops-small">{p.cliente.codigo}</div>
+                        )}
+                      </td>
+                      <td>{p.vendedor?.nombre || '—'}</td>
                       <td>
                         <EstadoOps estado={p.estado} />
                       </td>

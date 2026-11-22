@@ -303,6 +303,8 @@ const SQL_ORDEN = `
          c.cli_descripcion as cliente_nombre,
          c.cli_telefono as cliente_telefono,
          c.cli_direccion1 as cliente_direccion,
+         t.trn_vendedorasignado as vendedor_codigo,
+         v.vnd_descripcion as vendedor_nombre,
          o.id as operacion_id,
          o.estado as estado_ops,
          o.operario_id,
@@ -314,6 +316,7 @@ const SQL_ORDEN = `
          o.finalizado_en
     from arc_transacciones t
     left join arc_clientes c on c.cli_codigo = t.trn_responsable
+    left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
     left join app_operaciones_pedidos o on o.trn_id_auto = t.trn_id_auto
     left join app_operarios op on op.id = o.operario_id
     left join app_operarios ap on ap.id = o.asignado_por
@@ -413,6 +416,10 @@ async function getOrderForActor(orderId, actor) {
       nombre: h.cliente_nombre || 'Cliente no encontrado',
       telefono: h.cliente_telefono || '',
       direccion: h.cliente_direccion || ''
+    },
+    vendedor: {
+      codigo: h.vendedor_codigo || '',
+      nombre: h.vendedor_nombre || h.vendedor_codigo || '—'
     },
     operacion_id: operacionId,
     operario_id: h.operario_id ? Number(h.operario_id) : null,
@@ -584,6 +591,8 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
             t.trn_status as estado_a2,
             c.cli_codigo as cliente_codigo,
             c.cli_descripcion as cliente_nombre,
+            t.trn_vendedorasignado as vendedor_codigo,
+            v.vnd_descripcion as vendedor_nombre,
             coalesce(o.estado, 'pendiente') as estado,
             o.id as operacion_id,
             o.operario_id,
@@ -606,6 +615,7 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
                 and d.dtv_documento = t.trn_documento) as unidades
        from arc_transacciones t
        left join arc_clientes c on c.cli_codigo = t.trn_responsable
+       left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
        left join app_operaciones_pedidos o on o.trn_id_auto = t.trn_id_auto
        left join app_operarios op on op.id = o.operario_id
       where t.trn_tipo = 10
@@ -642,6 +652,10 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
         codigo: r.cliente_codigo || '',
         nombre: r.cliente_nombre || 'Cliente no encontrado'
       },
+      vendedor: {
+        codigo: r.vendedor_codigo || '',
+        nombre: r.vendedor_nombre || r.vendedor_codigo || '—'
+      },
       items_total: Number(r.items_total || 0),
       items_validados: Number(r.items_validados || 0),
       unidades: Number(r.unidades || 0),
@@ -661,6 +675,8 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     `select t.trn_documento as numero,
             t.trn_fechaemision as fecha,
             c.cli_descripcion as cliente,
+            t.trn_vendedorasignado as vendedor_codigo,
+            v.vnd_descripcion as vendedor_nombre,
             op.nombre as operario,
             o.operario_id,
             o.estado,
@@ -680,6 +696,7 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
        from app_operaciones_pedidos o
        join arc_transacciones t on t.trn_id_auto = o.trn_id_auto
        left join arc_clientes c on c.cli_codigo = t.trn_responsable
+       left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
        left join app_operarios op on op.id = o.operario_id
       where o.asignado_en::date between $1::date and $2::date
         and ($3::bigint is null or o.operario_id = $3)
@@ -713,6 +730,8 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     numero: p.numero,
     fecha: p.fecha,
     cliente: p.cliente || 'Cliente no encontrado',
+    vendedor: p.vendedor_nombre || p.vendedor_codigo || '—',
+    vendedor_codigo: p.vendedor_codigo || '',
     operario: p.operario || 'Sin operario',
     operario_id: p.operario_id ? Number(p.operario_id) : null,
     estado: p.estado,
