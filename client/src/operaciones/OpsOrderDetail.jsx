@@ -314,7 +314,7 @@ export default function OpsOrderDetail() {
         </section>
       </div>
 
-      <section className="card">
+      <section className="card ops-list-card">
         <div className="card-head">
           <div>
             <h2>Ítems del pedido</h2>
@@ -328,7 +328,8 @@ export default function OpsOrderDetail() {
         {pedido.items.length === 0 ? (
           <p className="empty">Este pedido no tiene ítems.</p>
         ) : (
-          <div className="table-wrap">
+          <>
+          <div className="table-wrap ops-desktop-table">
             <table className="table ops-table ops-items-table">
               <thead>
                 <tr>
@@ -389,6 +390,65 @@ export default function OpsOrderDetail() {
               </tbody>
             </table>
           </div>
+          <div className="ops-item-list">
+            {pedido.items.map((item) => (
+              <article
+                key={item.id || item.linea}
+                className={`ops-item-card ${item.validado ? 'validado' : ''}`}
+              >
+                <div className="ops-item-card-top">
+                  <div>
+                    <span className="ops-item-code">{item.codigo}</span>
+                    <strong>{item.descripcion}</strong>
+                  </div>
+                  <span className="ops-item-qty">×{item.cantidad}</span>
+                </div>
+                <div className="ops-item-card-meta">
+                  <div>
+                    <span>Estado</span>
+                    {item.validado ? (
+                      <span className="ops-status ops-status-armado">Validado</span>
+                    ) : (
+                      <span className="ops-status ops-status-pendiente">Pendiente</span>
+                    )}
+                  </div>
+                  <div>
+                    <span>Tiempo ítem</span>
+                    <strong>{formatDuration(item.duracion_segundos)}</strong>
+                  </div>
+                  <div>
+                    <span>Acumulado</span>
+                    <strong>{formatDuration(item.acumulado_segundos)}</strong>
+                  </div>
+                </div>
+                <div className="ops-item-card-foot">
+                  <span className="muted ops-small">
+                    {item.validado_por_nombre
+                      ? `Validado por ${item.validado_por_nombre}`
+                      : `Línea ${item.linea}`}
+                  </span>
+                  {item.validado ? (
+                    <button
+                      className="link"
+                      disabled={!permisos.validar || accion}
+                      onClick={() => validar(item, false)}
+                    >
+                      Quitar
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-sm btn-primary"
+                      disabled={!permisos.validar || !item.id || accion}
+                      onClick={() => validar(item, true)}
+                    >
+                      Validar
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+          </>
         )}
       </section>
     </div>

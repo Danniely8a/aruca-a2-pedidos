@@ -12,6 +12,18 @@ const esOperaciones =
   window.location.pathname === '/operaciones' ||
   window.location.pathname.startsWith('/operaciones/');
 
+if (esOperaciones) {
+  document.title = 'Aruca Almacén | Operaciones';
+  const manifest = document.querySelector('link[rel="manifest"]');
+  if (manifest) manifest.setAttribute('href', '/manifest-operaciones.webmanifest');
+  const theme = document.querySelector('meta[name="theme-color"]');
+  if (theme) theme.setAttribute('content', '#0f766e');
+  const appleTitle = document.querySelector(
+    'meta[name="apple-mobile-web-app-title"]'
+  );
+  if (appleTitle) appleTitle.setAttribute('content', 'Aruca Almacén');
+}
+
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

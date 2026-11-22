@@ -1,0 +1,48 @@
+{
+  "id": "/operaciones",
+  "name": "Aruca Almacén | Operaciones",
+  "short_name": "Almacén",
+  "description": "Módulo de operaciones de almacén de Aruca Maquinarias.",
+  "lang": "es-VE",
+  "start_url": "/operaciones",
+  "scope": "/operaciones",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f5fa",
+  "theme_color": "#0f766e",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pedidos",
+      "short_name": "Pedidos",
+      "url": "/operaciones/pedidos",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Reportes",
+      "short_name": "Reportes",
+      "url": "/operaciones/reportes",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

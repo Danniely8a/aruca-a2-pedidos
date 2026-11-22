@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { opsApi } from './api.js';
 import { useOpsAuth } from './OpsAuthContext.jsx';
+import OrderCard from './components/OrderCard.jsx';
 import {
   DuracionPedido,
   EstadoOps,
@@ -93,7 +94,7 @@ export default function OpsHome() {
         </div>
       </div>
 
-      <section className="card">
+      <section className="card ops-list-card">
           <div className="card-head">
             <div>
               <h2>Pedidos recientes</h2>
@@ -113,7 +114,8 @@ export default function OpsHome() {
                 : 'No tienes pedidos asignados por ahora.'}
             </p>
           ) : (
-            <div className="table-wrap">
+            <>
+            <div className="table-wrap ops-desktop-table">
               <table className="table ops-table">
                 <thead>
                   <tr>
@@ -157,6 +159,12 @@ export default function OpsHome() {
                 </tbody>
               </table>
             </div>
+            <div className="ops-order-list">
+              {recientes.map((p) => (
+                <OrderCard key={p.id} pedido={p} esJefe={esJefe} />
+              ))}
+            </div>
+            </>
           )}
         </section>
 

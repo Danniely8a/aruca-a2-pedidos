@@ -1,9 +1,10 @@
-const CACHE = 'a2-pedidos-v3';
+const CACHE = 'a2-pedidos-v4';
 
 const PRECACHE = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/manifest-operaciones.webmanifest',
   '/logo-aruca.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

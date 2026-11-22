@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { opsApi, opsPost } from './api.js';
 import { useOpsAuth } from './OpsAuthContext.jsx';
+import OrderCard from './components/OrderCard.jsx';
 import {
   DuracionPedido,
   EstadoOps,
@@ -203,7 +204,7 @@ export default function OpsOrders() {
         ))}
       </div>
 
-      <section className="card">
+      <section className="card ops-list-card">
         <div className="card-head">
           <div>
             <h2>Listado</h2>
@@ -217,9 +218,10 @@ export default function OpsOrders() {
           <p className="empty">Cargando pedidos…</p>
         ) : items.length === 0 ? (
           <p className="empty">No hay pedidos con ese filtro.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table ops-table">
+          ) : (
+            <>
+              <div className="table-wrap ops-desktop-table">
+              <table className="table ops-table">
               <thead>
                 <tr>
                   <th>Documento</th>
@@ -291,7 +293,21 @@ export default function OpsOrders() {
                 ))}
               </tbody>
             </table>
-          </div>
+              </div>
+              <div className="ops-order-list">
+                {items.map((p) => (
+                  <OrderCard
+                    key={p.id}
+                    pedido={p}
+                    esJefe={esJefe}
+                    onAsignar={(pedido) => {
+                      setOk('');
+                      setAsignar(pedido);
+                    }}
+                  />
+                ))}
+              </div>
+            </>
         )}
       </section>
 

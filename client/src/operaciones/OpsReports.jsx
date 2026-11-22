@@ -153,7 +153,7 @@ export default function OpsReports() {
           <p className="empty">No hay pedidos de almacén en ese rango.</p>
         ) : (
           <div className="table-wrap">
-            <table className="table ops-table">
+            <table className="table ops-table ops-table-stack">
               <thead>
                 <tr>
                   <th>Documento</th>
@@ -171,23 +171,23 @@ export default function OpsReports() {
               <tbody>
                 {pedidos.map((p) => (
                   <tr key={`${p.numero}-${p.asignado_en}`}>
-                    <td>
+                    <td data-label="Documento">
                       <strong>{p.numero}</strong>
                       <div className="muted ops-small">{formatFecha(p.fecha)}</div>
                     </td>
-                    <td>{p.cliente}</td>
-                    <td>{p.vendedor || '—'}</td>
-                    <td>{p.operario}</td>
-                    <td>
+                    <td data-label="Cliente">{p.cliente}</td>
+                    <td data-label="Vendedor">{p.vendedor || '—'}</td>
+                    <td data-label="Operario">{p.operario}</td>
+                    <td data-label="Estado">
                       <EstadoOps estado={p.estado} />
                     </td>
-                    <td>{formatFechaHora(p.asignado_en)}</td>
-                    <td>{formatFechaHora(p.iniciado_en)}</td>
-                    <td>{formatFechaHora(p.finalizado_en)}</td>
-                    <td>
+                    <td data-label="Asignado">{formatFechaHora(p.asignado_en)}</td>
+                    <td data-label="Inicio">{formatFechaHora(p.iniciado_en)}</td>
+                    <td data-label="Fin">{formatFechaHora(p.finalizado_en)}</td>
+                    <td data-label="Tiempo">
                       <strong>{formatDuration(p.duracion_segundos)}</strong>
                     </td>
-                    <td>
+                    <td data-label="Ítems">
                       {p.items_validados}/{p.items_total}
                     </td>
                   </tr>
@@ -212,7 +212,7 @@ export default function OpsReports() {
           <p className="empty">No hay ítems de almacén en ese rango.</p>
         ) : (
           <div className="table-wrap">
-            <table className="table ops-table">
+            <table className="table ops-table ops-table-stack">
               <thead>
                 <tr>
                   <th>Documento</th>
@@ -228,22 +228,22 @@ export default function OpsReports() {
               <tbody>
                 {items.map((i, idx) => (
                   <tr key={`${i.numero}-${i.codigo}-${idx}`}>
-                    <td>
+                    <td data-label="Documento">
                       <strong>{i.numero}</strong>
                     </td>
-                    <td>{i.operario}</td>
-                    <td>{i.codigo}</td>
-                    <td>{i.descripcion}</td>
-                    <td className="right">{i.cantidad}</td>
-                    <td>
+                    <td data-label="Operario">{i.operario}</td>
+                    <td data-label="Código">{i.codigo}</td>
+                    <td data-label="Producto">{i.descripcion}</td>
+                    <td className="right" data-label="Cantidad">{i.cantidad}</td>
+                    <td data-label="Estado">
                       {i.validado ? (
                         <span className="ops-status ops-status-armado">Validado</span>
                       ) : (
                         <span className="ops-status ops-status-pendiente">Pendiente</span>
                       )}
                     </td>
-                    <td>{formatFechaHora(i.validado_en)}</td>
-                    <td>{formatDuration(i.duracion_segundos)}</td>
+                    <td data-label="Validado">{formatFechaHora(i.validado_en)}</td>
+                    <td data-label="Tiempo">{formatDuration(i.duracion_segundos)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -261,7 +261,7 @@ export default function OpsReports() {
           <p className="empty">No hay datos por operario.</p>
         ) : (
           <div className="table-wrap">
-            <table className="table ops-table">
+            <table className="table ops-table ops-table-stack">
               <thead>
                 <tr>
                   <th>Operario</th>
@@ -275,16 +275,20 @@ export default function OpsReports() {
               <tbody>
                 {porOperario.map((o) => (
                   <tr key={o.operario}>
-                    <td>
+                    <td data-label="Operario">
                       <strong>{o.operario}</strong>
                     </td>
-                    <td className="right">{o.pedidos}</td>
-                    <td className="right">{o.armados}</td>
-                    <td className="right">
+                    <td className="right" data-label="Pedidos">{o.pedidos}</td>
+                    <td className="right" data-label="Armados">{o.armados}</td>
+                    <td className="right" data-label="Ítems">
                       {o.items_validados}/{o.items}
                     </td>
-                    <td>{formatDuration(o.tiempo_promedio_pedido_segundos)}</td>
-                    <td>{formatDuration(o.tiempo_promedio_item_segundos)}</td>
+                    <td data-label="Promedio pedido">
+                      {formatDuration(o.tiempo_promedio_pedido_segundos)}
+                    </td>
+                    <td data-label="Promedio ítem">
+                      {formatDuration(o.tiempo_promedio_item_segundos)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

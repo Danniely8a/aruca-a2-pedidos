@@ -202,7 +202,7 @@ export default function OpsWorkers() {
           </form>
         </section>
 
-        <section className="card">
+        <section className="card ops-list-card">
           <div className="card-head">
             <div>
               <h2>Equipo</h2>
@@ -215,7 +215,8 @@ export default function OpsWorkers() {
           {items.length === 0 ? (
             <p className="empty">Todavía no hay operarios registrados.</p>
           ) : (
-            <div className="table-wrap">
+            <>
+            <div className="table-wrap ops-desktop-table">
               <table className="table ops-table">
                 <thead>
                   <tr>
@@ -267,6 +268,48 @@ export default function OpsWorkers() {
                 </tbody>
               </table>
             </div>
+            <div className="ops-worker-list">
+              {items.map((o) => (
+                <article className="ops-worker-card" key={o.id}>
+                  <div className="ops-worker-card-top">
+                    <div>
+                      <strong>{o.nombre}</strong>
+                      {Number(o.id) === Number(user?.id) && (
+                        <span className="tag ops-tag-self">Tú</span>
+                      )}
+                      <div className="muted ops-small">{o.email}</div>
+                    </div>
+                    <span
+                      className={`ops-status ${
+                        o.activo ? 'ops-status-armado' : 'ops-status-pendiente'
+                      }`}
+                    >
+                      {o.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  <div className="ops-worker-card-meta">
+                    <span>{o.rol === 'jefe' ? 'Jefe de almacén' : 'Operario'}</span>
+                    <span>Creado {formatFecha(o.creado_en)}</span>
+                  </div>
+                  <div className="ops-worker-card-foot">
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => editar(o)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => alternar(o)}
+                      disabled={Number(o.id) === Number(user?.id)}
+                    >
+                      {o.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            </>
           )}
         </section>
       </div>
