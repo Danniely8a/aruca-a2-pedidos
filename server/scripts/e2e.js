@@ -133,6 +133,16 @@ async function main() {
     check('login vendedor', carlos.status === 200);
     const tCarlos = carlos.data.token;
 
+    const carlosMayus = await req('/api/auth/login', {
+      method: 'POST',
+      body: { usuario: 'CARLOS@EMPRESA.COM', password: 'vendedor123' }
+    });
+    check(
+      'login con correo en mayúsculas',
+      carlosMayus.status === 200,
+      `=${carlosMayus.status}`
+    );
+
     const productos = await req('/api/productos', { token: tAdmin });
     check('catálogo trae 16 productos', productos.data.total === 16, `=${productos.data.total}`);
     check(

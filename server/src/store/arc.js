@@ -307,7 +307,7 @@ export const arcStore = {
               a.password_hash
          from arc_users u
          left join app_accesos a on a.id_usuario = u.usr_idauto
-        where (u.usr_login = $1 or u.usr_emailusuario = $1)
+        where (lower(u.usr_login) = lower($1) or lower(u.usr_emailusuario) = lower($1))
         limit 1`,
       [String(login).trim()]
     );
