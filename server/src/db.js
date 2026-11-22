@@ -66,4 +66,62 @@ export async function ensureAppSchema() {
       actualizado_en      timestamptz not null default now()
     )
   `);
+
+  // Módulo de operaciones de almacén: usuarios propios, órdenes de armado y
+  // validación/tiempos por cada línea del pedido.
+  await pool.query(`
+    create table if not exists app_operarios (
+      id             bigserial primary key,
+      nombre         text not null,
+      email          text not null,
+      password_hash  text not null,
+      rol            text not null default 'operario' check (rol in ('jefe','operario')),
+      activo         boolean not null default true,
+      creado_en      timestamptz not null default now(),
+      actualizado_en timestamptz not null default now()
+    )
+  `);
+  await pool.query(
+    'create unique index if not exists app_operarios_email_uniq on app_operarios (lower(email))'
+  );
+  await pool.query(`
+    create table if not exists app_operaciones_pedidos (
+      id             bigserial primary key,
+      trn_id_auto    bigint not null unique,
+      operario_id    bigint references app_operarios(id) on delete set null,
+      asignado_por   bigint references app_operarios(id) on delete set null,
+      estado         text not null default 'asignado'
+                     check (estado in ('asignado','en_proceso','armado')),
+      asignado_en    timestamptz not null default now(),
+      iniciado_en    timestamptz,
+      finalizado_en  timestamptz,
+      creado_en      timestamptz not null default now(),
+      actualizado_en timestamptz not null default now()
+    )
+  `);
+  await pool.query(
+    'create index if not exists app_operaciones_pedidos_operario_idx on app_operaciones_pedidos (operario_id)'
+  );
+  await pool.query(
+    'create index if not exists app_operaciones_pedidos_estado_idx on app_operaciones_pedidos (estado)'
+  );
+  await pool.query(`
+    create table if not exists app_operaciones_items (
+      id                bigserial primary key,
+      operacion_id      bigint not null references app_operaciones_pedidos(id) on delete cascade,
+      linea             integer not null,
+      codigo            text not null,
+      descripcion       text,
+      cantidad          numeric(14,2) not null default 0,
+      validado          boolean not null default false,
+      validado_por      bigint references app_operarios(id) on delete set null,
+      validado_en       timestamptz,
+      duracion_segundos integer,
+      creado_en         timestamptz not null default now(),
+      unique (operacion_id, linea)
+    )
+  `);
+  await pool.query(
+    'create index if not exists app_operaciones_items_operacion_idx on app_operaciones_items (operacion_id)'
+  );
 }

@@ -1,4 +1,4 @@
-const CACHE = 'a2-pedidos-v2';
+const CACHE = 'a2-pedidos-v3';
 
 const PRECACHE = [
   '/',

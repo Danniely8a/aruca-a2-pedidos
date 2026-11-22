@@ -12,6 +12,7 @@ import orderRoutes from './routes/orders.js';
 import dashboardRoutes from './routes/dashboard.js';
 import reportRoutes from './routes/reports.js';
 import settingsRoutes from './routes/settings.js';
+import operationsRoutes from './routes/operations.js';
 import { ApiError } from './middleware/errors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/operaciones', operationsRoutes);
 app.use('/api', catalogRoutes);
 app.use('/api', orderRoutes);
 app.use('/api', dashboardRoutes);

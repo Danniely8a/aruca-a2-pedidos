@@ -103,6 +103,10 @@ export default function Login() {
             {loading ? 'Validando…' : 'Entrar a la plataforma'}
           </button>
 
+          <a className="link login-alt" href="/operaciones/login">
+            ¿Eres del personal de almacén? Entrar aquí
+          </a>
+
           {demo && (
             <div className="demo-box">
               <strong>Modo demostración (sin base de datos)</strong>

@@ -17,6 +17,9 @@ export async function requireAuth(req, res, next) {
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const payload = jwt.verify(token, config.jwtSecret);
+    if (payload.scope && payload.scope !== 'ventas') {
+      return res.status(401).json({ error: 'Token no válido para ventas' });
+    }
     const user = await store.getUserById(payload.sub);
     if (!user || !user.activo) {
       return res.status(401).json({ error: 'Sesión inválida o usuario inactivo' });

@@ -95,7 +95,10 @@ async function main() {
       ...process.env,
       DATABASE_URL: url.toString(),
       PG_SEARCH_PATH: 'a2_test,public',
-      PORT: String(PUERTO)
+      PORT: String(PUERTO),
+      OPS_ADMIN_NOMBRE: 'Jefe de Almacén',
+      OPS_ADMIN_EMAIL: 'jefe@empresa.com',
+      OPS_ADMIN_PASSWORD: 'almacen123'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -240,6 +243,162 @@ async function main() {
       'detalle incluye ficha completa del cliente',
       Boolean(detalle.data.pedido?.cliente?.telefono),
       JSON.stringify(detalle.data.pedido?.cliente)
+    );
+
+    // --- Módulo de operaciones de almacén ---------------------------------
+    const opsLogin = await req('/api/operaciones/auth/login', {
+      method: 'POST',
+      body: { usuario: 'jefe@empresa.com', password: 'almacen123' }
+    });
+    check(
+      'login de jefe de almacén',
+      opsLogin.status === 200,
+      JSON.stringify(opsLogin.data)
+    );
+    const tOps = opsLogin.data.token;
+
+    check(
+      'operaciones sin token → 401',
+      (await req('/api/operaciones/pedidos')).status === 401
+    );
+    check(
+      'token de ventas no entra a operaciones → 401',
+      (await req('/api/operaciones/pedidos', { token: tAdmin })).status === 401
+    );
+    check(
+      'token de operaciones no entra a ventas → 401',
+      (await req('/api/pedidos', { token: tOps })).status === 401
+    );
+
+    const operarioCreado = await req('/api/operaciones/operarios', {
+      method: 'POST',
+      token: tOps,
+      body: {
+        nombre: 'Pedro Almacén',
+        email: 'pedro@empresa.com',
+        password: 'pedro123',
+        rol: 'operario'
+      }
+    });
+    check(
+      'crear operario de almacén → 201',
+      operarioCreado.status === 201,
+      JSON.stringify(operarioCreado.data)
+    );
+    const operarioId = operarioCreado.data.operario?.id;
+
+    const opsLista = await req('/api/operaciones/pedidos', { token: tOps });
+    check(
+      'jefe ve pedidos para armar',
+      opsLista.data.items?.some((p) => p.id === creado.data.pedido.id),
+      JSON.stringify(opsLista.data.items)
+    );
+
+    const asignado = await req(
+      `/api/operaciones/pedidos/${creado.data.pedido.id}/asignar`,
+      {
+        method: 'POST',
+        token: tOps,
+        body: { operario_id: operarioId }
+      }
+    );
+    check(
+      'asignar pedido a operario',
+      asignado.status === 200 &&
+        Number(asignado.data.pedido?.operario_id) === Number(operarioId),
+      JSON.stringify(asignado.data)
+    );
+
+    const pedro = await req('/api/operaciones/auth/login', {
+      method: 'POST',
+      body: { usuario: 'PEDRO@EMPRESA.COM', password: 'pedro123' }
+    });
+    check(
+      'login de operario (correo en mayúsculas)',
+      pedro.status === 200,
+      JSON.stringify(pedro.data)
+    );
+    const tPedro = pedro.data.token;
+
+    const pedroLista = await req('/api/operaciones/pedidos', { token: tPedro });
+    check(
+      'operario ve solo su pedido asignado',
+      pedroLista.data.total === 1 &&
+        pedroLista.data.items?.[0]?.id === creado.data.pedido.id,
+      JSON.stringify(pedroLista.data)
+    );
+    check(
+      'operario no puede asignar → 403',
+      (
+        await req(`/api/operaciones/pedidos/${creado.data.pedido.id}/asignar`, {
+          method: 'POST',
+          token: tPedro,
+          body: { operario_id: operarioId }
+        })
+      ).status === 403
+    );
+    check(
+      'operario no puede ver operarios → 403',
+      (await req('/api/operaciones/operarios', { token: tPedro })).status === 403
+    );
+
+    const iniciado = await req(
+      `/api/operaciones/pedidos/${creado.data.pedido.id}/iniciar`,
+      { method: 'POST', token: tPedro }
+    );
+    check(
+      'iniciar armado → en proceso',
+      iniciado.status === 200 && iniciado.data.pedido?.estado === 'en_proceso',
+      JSON.stringify(iniciado.data)
+    );
+    const itemsOps = iniciado.data.pedido?.items || [];
+    check('operaciones crea un ítem por línea', itemsOps.length === 2, `=${itemsOps.length}`);
+
+    let ultimo = iniciado;
+    for (const item of itemsOps) {
+      ultimo = await req(
+        `/api/operaciones/pedidos/${creado.data.pedido.id}/items/${item.id}/validar`,
+        { method: 'POST', token: tPedro, body: { validado: true } }
+      );
+      check(
+        `validar ítem ${item.linea}`,
+        ultimo.status === 200 &&
+          ultimo.data.pedido?.items?.find((x) => x.id === item.id)?.validado ===
+            true,
+        JSON.stringify(ultimo.data)
+      );
+    }
+    check(
+      'pedido armado al validar todo',
+      ultimo.data.pedido?.estado === 'armado',
+      JSON.stringify(ultimo.data.pedido)
+    );
+    check(
+      'tiempo por pedido registrado',
+      Number(ultimo.data.pedido?.duracion_segundos) >= 0,
+      `=${ultimo.data.pedido?.duracion_segundos}`
+    );
+    check(
+      'tiempo por ítem registrado',
+      (ultimo.data.pedido?.items || []).every(
+        (i) => i.duracion_segundos !== null
+      ),
+      JSON.stringify(ultimo.data.pedido?.items)
+    );
+
+    check(
+      'operario no puede ver reportes → 403',
+      (await req('/api/operaciones/reportes', { token: tPedro })).status === 403
+    );
+    const reporteOps = await req(
+      '/api/operaciones/reportes?desde=2020-01-01&hasta=2099-12-31',
+      { token: tOps }
+    );
+    check(
+      'reporte de tiempos incluye el pedido',
+      reporteOps.status === 200 &&
+        reporteOps.data.pedidos?.some((p) => p.numero === numero),
+      JSON.stringify(reporteOps.data.resumen)
     );
 
     const cambio = await req(`/api/pedidos/${creado.data.pedido.id}/estado`, {

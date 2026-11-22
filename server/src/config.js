@@ -5,11 +5,19 @@ const int = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me';
+
 export const config = {
   port: int(process.env.PORT, 4000),
   databaseUrl: (process.env.DATABASE_URL || '').trim(),
-  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
+  jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '12h',
+  // Sesión separada para el personal de almacén. Nunca comparte el token de ventas.
+  opsJwtSecret: process.env.OPS_JWT_SECRET || `${jwtSecret}:operaciones`,
+  opsJwtExpiresIn: process.env.OPS_JWT_EXPIRES_IN || '12h',
+  opsAdminNombre: process.env.OPS_ADMIN_NOMBRE || 'Jefe de Almacén',
+  opsAdminEmail: process.env.OPS_ADMIN_EMAIL || 'almacen@arucamaquinarias.com',
+  opsAdminPassword: process.env.OPS_ADMIN_PASSWORD || 'ArucaAlmacen2026*',
   // Impuesto: acepta 0.16 (fracción) o 16 (porcentaje) → se normaliza a fracción
   taxRate: (() => {
     const v = int(process.env.TAX_RATE, 0.16);
