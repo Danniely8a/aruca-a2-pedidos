@@ -6,7 +6,8 @@ import OrderCard from './components/OrderCard.jsx';
 import {
   DuracionPedido,
   EstadoOps,
-  formatFecha
+  formatFecha,
+  formatFechaHora
 } from './ui.jsx';
 
 function AsignarModal({ pedido, operarios, onClose, onAssigned }) {
@@ -128,6 +129,19 @@ export default function OpsOrders() {
   useEffect(() => {
     const t = setTimeout(cargar, q ? 220 : 0);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, estado, operarioFiltro, esJefe]);
+
+  useEffect(() => {
+    const refrescar = () => {
+      if (!document.hidden) cargar();
+    };
+    const id = setInterval(refrescar, 30000);
+    document.addEventListener('visibilitychange', refrescar);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', refrescar);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, estado, operarioFiltro, esJefe]);
 
@@ -257,7 +271,14 @@ export default function OpsOrders() {
                         {p.unidades} unidad{p.unidades === 1 ? '' : 'es'}
                       </div>
                     </td>
-                    <td>{p.operario_nombre || '—'}</td>
+                    <td>
+                      {p.operario_nombre || '—'}
+                      {p.asignado_en && (
+                        <div className="muted ops-small">
+                          {formatFechaHora(p.asignado_en)}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <EstadoOps estado={p.estado} />
                     </td>

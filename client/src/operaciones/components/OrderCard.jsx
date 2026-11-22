@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom';
-import { DuracionPedido, EstadoOps, formatFecha } from '../ui.jsx';
+import {
+  DuracionPedido,
+  EstadoOps,
+  formatFecha,
+  formatFechaHora
+} from '../ui.jsx';
 
 export default function OrderCard({ pedido, esJefe, onAsignar }) {
   const pendiente = pedido.estado === 'pendiente';
@@ -23,6 +28,13 @@ export default function OrderCard({ pedido, esJefe, onAsignar }) {
         <span>Vendedor</span>
         <strong>{pedido.vendedor?.nombre || '—'}</strong>
       </div>
+
+      {pedido.asignado_en && (
+        <div className="ops-order-card-assigned">
+          <span>Asignado</span>
+          <strong>{formatFechaHora(pedido.asignado_en)}</strong>
+        </div>
+      )}
 
       <div className="ops-order-card-grid">
         {esJefe && (

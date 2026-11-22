@@ -2969,6 +2969,16 @@ p {
 .ops-order-card-seller span {
   color: var(--muted);
 }
+.ops-order-card-assigned {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 0.76rem;
+}
+.ops-order-card-assigned span {
+  color: var(--muted);
+}
 .ops-order-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
@@ -3099,6 +3109,30 @@ p {
   margin-top: 10px;
   color: var(--muted);
   font-size: 0.78rem;
+}
+.ops-worker-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.ops-worker-card-stats > div {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+.ops-worker-card-stats span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ops-worker-card-stats strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.8rem;
 }
 .ops-worker-card-foot {
   display: flex;

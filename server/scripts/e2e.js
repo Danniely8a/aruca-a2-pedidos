@@ -346,6 +346,11 @@ async function main() {
       JSON.stringify(pedroLista.data)
     );
     check(
+      'operario ve la hora de asignación',
+      Boolean(pedroLista.data.items?.[0]?.asignado_en),
+      JSON.stringify(pedroLista.data.items?.[0])
+    );
+    check(
       'operario no puede asignar → 403',
       (
         await req(`/api/operaciones/pedidos/${creado.data.pedido.id}/asignar`, {
@@ -424,6 +429,20 @@ async function main() {
         reporteOps.data.pedidos?.find((p) => p.numero === numero)?.vendedor
       ),
       JSON.stringify(reporteOps.data.pedidos?.[0])
+    );
+
+    const equipoOps = await req('/api/operaciones/operarios', { token: tOps });
+    const pedroStats = equipoOps.data.items?.find(
+      (o) => o.id === operarioId
+    );
+    check(
+      'operario muestra pedidos armados y tiempo promedio',
+      Boolean(
+        pedroStats &&
+          Number(pedroStats.armados) >= 1 &&
+          Number.isFinite(Number(pedroStats.tiempo_promedio_segundos))
+      ),
+      JSON.stringify(pedroStats)
     );
 
     const cambio = await req(`/api/pedidos/${creado.data.pedido.id}/estado`, {

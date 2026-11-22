@@ -22,7 +22,10 @@ function mapOperario(r) {
     rol: r.rol === 'jefe' ? 'jefe' : 'operario',
     activo: r.activo !== false,
     creado_en: r.creado_en || null,
-    actualizado_en: r.actualizado_en || null
+    actualizado_en: r.actualizado_en || null,
+    asignados: Number(r.asignados || 0),
+    armados: Number(r.armados || 0),
+    tiempo_promedio_segundos: Number(r.tiempo_promedio_segundos || 0)
   };
 }
 
@@ -91,9 +94,21 @@ async function findByEmail(email) {
 
 async function listOperarios() {
   const { rows } = await q(
-    `select id, nombre, email, rol, activo, creado_en, actualizado_en
-       from app_operarios
-      order by activo desc, nombre asc`
+    `select o.id, o.nombre, o.email, o.rol, o.activo, o.creado_en, o.actualizado_en,
+            (select count(*)::int from app_operaciones_pedidos p
+              where p.operario_id = o.id
+                and p.estado in ('asignado','en_proceso')) as asignados,
+            (select count(*)::int from app_operaciones_pedidos p
+              where p.operario_id = o.id and p.estado = 'armado') as armados,
+            (select coalesce(floor(avg(extract(epoch from
+                      (p.finalizado_en - p.iniciado_en))))::int, 0)
+               from app_operaciones_pedidos p
+              where p.operario_id = o.id
+                and p.estado = 'armado'
+                and p.iniciado_en is not null
+                and p.finalizado_en is not null) as tiempo_promedio_segundos
+       from app_operarios o
+      order by o.activo desc, o.nombre asc`
   );
   return rows.map(mapOperario);
 }

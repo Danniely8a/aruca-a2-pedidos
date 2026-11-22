@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { opsApi, opsPatch, opsPost } from './api.js';
 import { useOpsAuth } from './OpsAuthContext.jsx';
-import { formatFecha } from './ui.jsx';
+import { formatDuration, formatFecha } from './ui.jsx';
 
 const FORM_VACIO = {
   nombre: '',
@@ -224,6 +224,9 @@ export default function OpsWorkers() {
                     <th>Correo</th>
                     <th>Rol</th>
                     <th>Estado</th>
+                    <th className="right">Asignados</th>
+                    <th className="right">Armados</th>
+                    <th>Tiempo prom.</th>
                     <th>Creado</th>
                     <th></th>
                   </tr>
@@ -248,6 +251,9 @@ export default function OpsWorkers() {
                           {o.activo ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
+                      <td className="right">{o.asignados ?? 0}</td>
+                      <td className="right">{o.armados ?? 0}</td>
+                      <td>{formatDuration(o.tiempo_promedio_segundos)}</td>
                       <td>{formatFecha(o.creado_en)}</td>
                       <td>
                         <div className="ops-row-actions">
@@ -290,6 +296,20 @@ export default function OpsWorkers() {
                   <div className="ops-worker-card-meta">
                     <span>{o.rol === 'jefe' ? 'Jefe de almacén' : 'Operario'}</span>
                     <span>Creado {formatFecha(o.creado_en)}</span>
+                  </div>
+                  <div className="ops-worker-card-stats">
+                    <div>
+                      <span>Asignados</span>
+                      <strong>{o.asignados ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span>Armados</span>
+                      <strong>{o.armados ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span>Tiempo prom.</span>
+                      <strong>{formatDuration(o.tiempo_promedio_segundos)}</strong>
+                    </div>
                   </div>
                   <div className="ops-worker-card-foot">
                     <button

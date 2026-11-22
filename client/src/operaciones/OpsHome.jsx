@@ -6,7 +6,9 @@ import OrderCard from './components/OrderCard.jsx';
 import {
   DuracionPedido,
   EstadoOps,
-  formatFecha
+  formatDuration,
+  formatFecha,
+  formatFechaHora
 } from './ui.jsx';
 
 export default function OpsHome() {
@@ -26,16 +28,42 @@ export default function OpsHome() {
 
   useEffect(cargar, []);
 
+  useEffect(() => {
+    const refrescar = () => {
+      if (!document.hidden) cargar();
+    };
+    const id = setInterval(refrescar, 30000);
+    document.addEventListener('visibilitychange', refrescar);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', refrescar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stats = useMemo(() => {
     const pendientes = items.filter((i) => i.estado === 'pendiente').length;
     const asignados = items.filter((i) => i.estado === 'asignado').length;
     const enProceso = items.filter((i) => i.estado === 'en_proceso').length;
-    const armados = items.filter((i) => i.estado === 'armado').length;
+    const armados = items.filter((i) => i.estado === 'armado');
     const porValidar = items.reduce(
       (s, i) => s + Math.max(0, Number(i.items_total) - Number(i.items_validados)),
       0
     );
-    return { pendientes, asignados, enProceso, armados, porValidar };
+    const tiempoPromedio = armados.length
+      ? Math.round(
+          armados.reduce((s, i) => s + Number(i.duracion_segundos || 0), 0) /
+            armados.length
+        )
+      : 0;
+    return {
+      pendientes,
+      asignados,
+      enProceso,
+      armados: armados.length,
+      porValidar,
+      tiempoPromedio
+    };
   }, [items]);
 
   const recientes = items.slice(0, 6);
@@ -64,13 +92,15 @@ export default function OpsHome() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="cards dashboard-stats">
-        <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-amber">PA</span>
-          <div>
-            <span>Por asignar</span>
-            <strong>{stats.pendientes}</strong>
+        {esJefe && (
+          <div className="card stat stat-card">
+            <span className="stat-icon stat-icon-amber">PA</span>
+            <div>
+              <span>Por asignar</span>
+              <strong>{stats.pendientes}</strong>
+            </div>
           </div>
-        </div>
+        )}
         <div className="card stat stat-card">
           <span className="stat-icon stat-icon-blue">AS</span>
           <div>
@@ -92,6 +122,15 @@ export default function OpsHome() {
             <strong>{stats.armados}</strong>
           </div>
         </div>
+        {!esJefe && (
+          <div className="card stat stat-card">
+            <span className="stat-icon stat-icon-amber">TP</span>
+            <div>
+              <span>Tiempo promedio</span>
+              <strong>{formatDuration(stats.tiempoPromedio)}</strong>
+            </div>
+          </div>
+        )}
       </div>
 
       <section className="card ops-list-card">
@@ -153,6 +192,11 @@ export default function OpsHome() {
                           finalizado_en={p.finalizado_en}
                           duracion_segundos={p.duracion_segundos}
                         />
+                        {p.asignado_en && (
+                          <div className="muted ops-small">
+                            Asignado {formatFechaHora(p.asignado_en)}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
