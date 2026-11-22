@@ -15,7 +15,19 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="A2 Pedidos" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      (() => {
+        const esOps =
+          location.pathname === '/operaciones' ||
+          location.pathname.startsWith('/operaciones/');
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = esOps
+          ? '/manifest-operaciones.webmanifest'
+          : '/manifest.webmanifest';
+        document.head.appendChild(link);
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>A2 Pedidos | Montaje de pedidos</title>
