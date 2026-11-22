@@ -1038,7 +1038,9 @@ export const arcStore = {
       );
       await c.query('commit');
 
-      const { rows: p } = await q(`${SQL_PEDIDOS} where t.trn_id_auto = $1`, [id]);
+      const { rows: p } = await c.query(`${SQL_PEDIDOS} where t.trn_id_auto = $1`, [
+        id
+      ]);
       return p[0] ? mapearPedido(p[0]) : null;
     } catch (err) {
       await c.query('rollback').catch(() => {});

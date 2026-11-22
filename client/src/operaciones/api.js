@@ -14,15 +14,27 @@ export async function opsApi(path, { method = 'GET', body, auth = true } = {}) {
   const token = localStorage.getItem(OPS_TOKEN_KEY);
   if (auth && token) headers.Authorization = `Bearer ${token}`;
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+
   let res;
   try {
     res = await fetch(`${BASE}${path}`, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
     });
-  } catch {
+  } catch (e) {
+    if (e?.name === 'AbortError') {
+      throw new OpsApiError(
+        'El servidor tardó demasiado. Intenta de nuevo.',
+        0
+      );
+    }
     throw new OpsApiError('No hay conexión con el servidor', 0);
+  } finally {
+    clearTimeout(timer);
   }
 
   let data = {};

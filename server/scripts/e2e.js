@@ -95,6 +95,7 @@ async function main() {
       ...process.env,
       DATABASE_URL: url.toString(),
       PG_SEARCH_PATH: 'a2_test,public',
+      PG_POOL_MAX: '1',
       PORT: String(PUERTO),
       OPS_ADMIN_NOMBRE: 'Jefe de Almacén',
       OPS_ADMIN_EMAIL: 'jefe@empresa.com',

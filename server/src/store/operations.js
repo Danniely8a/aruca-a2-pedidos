@@ -171,8 +171,8 @@ async function updateOperario(id, data, actorId) {
   return findById(id);
 }
 
-async function getOrderDetails(orderId) {
-  const { rows } = await q(
+async function getOrderDetails(orderId, db = pool) {
+  const { rows } = await db.query(
     `select d.dtv_linea as linea,
             d.dtv_codigo as codigo,
             coalesce(p.inv_descripcion, d.dtv_codigo) as descripcion,
@@ -195,7 +195,7 @@ async function getOrderDetails(orderId) {
 }
 
 async function syncItems(db, operacionId, orderId) {
-  const detalles = await getOrderDetails(orderId);
+  const detalles = await getOrderDetails(orderId, db);
   const lineas = detalles.map((d) => d.linea);
 
   if (lineas.length) {

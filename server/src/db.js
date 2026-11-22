@@ -4,6 +4,7 @@ import { config } from './config.js';
 const { Pool } = pg;
 
 export const isConnected = Boolean(config.databaseUrl);
+const poolMax = Number(process.env.PG_POOL_MAX);
 
 // Algunas cadenas de Supabase traen sslmode=require; lo quitamos para poder
 // controlar el SSL desde aquí (supabase usa certificados que Node no valida
@@ -24,7 +25,12 @@ function buildConfig(url) {
     ...(process.env.PG_SEARCH_PATH
       ? { options: `-c search_path=${process.env.PG_SEARCH_PATH}` }
       : {}),
-    max: process.env.VERCEL ? 1 : 10,
+    max:
+      Number.isFinite(poolMax) && poolMax > 0
+        ? Math.trunc(poolMax)
+        : process.env.VERCEL
+          ? 1
+          : 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000
   };
