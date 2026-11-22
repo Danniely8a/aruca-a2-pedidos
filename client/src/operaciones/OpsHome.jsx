@@ -93,8 +93,7 @@ export default function OpsHome() {
         </div>
       </div>
 
-      <div className="grid-2 dashboard-grid">
-        <section className="card">
+      <section className="card">
           <div className="card-head">
             <div>
               <h2>Pedidos recientes</h2>
@@ -161,30 +160,6 @@ export default function OpsHome() {
           )}
         </section>
 
-        <section className="card">
-          <div className="card-head">
-            <h2>Accesos rápidos</h2>
-          </div>
-          <div className="quick-grid">
-            <Link className="quick-item" to="/operaciones/pedidos">
-              <strong>Pedidos</strong>
-              <span>Asignar, armar y validar</span>
-            </Link>
-            {esJefe && (
-              <Link className="quick-item" to="/operaciones/operarios">
-                <strong>Operarios</strong>
-                <span>Crear y administrar el equipo</span>
-              </Link>
-            )}
-            {esJefe && (
-              <Link className="quick-item" to="/operaciones/reportes">
-                <strong>Reportes</strong>
-                <span>Tiempos por pedido e ítem</span>
-              </Link>
-            )}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }
