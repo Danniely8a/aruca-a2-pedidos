@@ -64,7 +64,8 @@ router.get(
     const items = await opsStore.listOrders({
       operarioId,
       estado: req.query.estado || '',
-      q: req.query.q || ''
+      q: req.query.q || '',
+      soloFaltantes: req.query.faltantes === '1'
     });
     res.json({ items, total: items.length });
   })
@@ -81,6 +82,7 @@ router.get(
       pedido.operario_id != null &&
       Number(pedido.operario_id) === Number(req.operario.id);
     const puedeOperar = esJefe || asignadoAmi;
+    const abierto = pedido.estado !== 'armado' && !pedido.armado_parcial;
 
     res.json({
       pedido,
@@ -91,7 +93,20 @@ router.get(
           Boolean(pedido.operacion_id) &&
           !pedido.iniciado_en &&
           pedido.estado !== 'armado',
-        validar: puedeOperar && Boolean(pedido.iniciado_en)
+        validar:
+          puedeOperar && Boolean(pedido.iniciado_en) && !pedido.armado_parcial,
+        faltante:
+          puedeOperar &&
+          Boolean(pedido.iniciado_en) &&
+          pedido.estado !== 'armado' &&
+          !pedido.armado_parcial,
+        autorizar_parcial:
+          esJefe &&
+          abierto &&
+          Boolean(pedido.iniciado_en) &&
+          pedido.items_faltantes > 0 &&
+          pedido.items_validados + pedido.items_faltantes === pedido.items_total,
+        reabrir: esJefe && pedido.armado_parcial === true
       }
     });
   })
@@ -132,6 +147,42 @@ router.post(
       validado,
       req.operario
     );
+    res.json({ pedido });
+  })
+);
+
+router.post(
+  '/pedidos/:id/items/:itemId/faltante',
+  asyncHandler(async (req, res) => {
+    const faltante = req.body?.faltante !== false;
+    const pedido = await opsStore.markFaltante(
+      req.params.id,
+      req.params.itemId,
+      faltante,
+      req.body?.motivo || '',
+      req.operario
+    );
+    res.json({ pedido });
+  })
+);
+
+router.post(
+  '/pedidos/:id/armado-parcial',
+  requireJefe,
+  asyncHandler(async (req, res) => {
+    const pedido = await opsStore.authorizePartial(
+      req.params.id,
+      req.operario
+    );
+    res.json({ pedido });
+  })
+);
+
+router.post(
+  '/pedidos/:id/reabrir',
+  requireJefe,
+  asyncHandler(async (req, res) => {
+    const pedido = await opsStore.reopenPartial(req.params.id, req.operario);
     res.json({ pedido });
   })
 );

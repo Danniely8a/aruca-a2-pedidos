@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import {
   DuracionPedido,
   EstadoOps,
+  FaltanteTag,
   formatFecha,
   formatFechaHora
 } from '../ui.jsx';
@@ -16,7 +17,13 @@ export default function OrderCard({ pedido, esJefe, onAsignar }) {
           <strong>{pedido.numero}</strong>
           <span>{formatFecha(pedido.fecha)}</span>
         </Link>
-        <EstadoOps estado={pedido.estado} />
+        <div className="ops-order-card-tags">
+          <EstadoOps
+            estado={pedido.estado}
+            parcial={pedido.armado_parcial}
+          />
+          <FaltanteTag count={pedido.items_faltantes} />
+        </div>
       </div>
 
       <div className="ops-order-card-client">{pedido.cliente?.nombre}</div>

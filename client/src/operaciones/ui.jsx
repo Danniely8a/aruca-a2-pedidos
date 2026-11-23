@@ -30,7 +30,12 @@ export function formatFechaHora(value) {
   });
 }
 
-export function EstadoOps({ estado }) {
+export function EstadoOps({ estado, parcial = false }) {
+  if (parcial) {
+    return (
+      <span className="ops-status ops-status-parcial">Armado parcial</span>
+    );
+  }
   const labels = {
     pendiente: 'Por asignar',
     asignado: 'Asignado',
@@ -40,6 +45,16 @@ export function EstadoOps({ estado }) {
   return (
     <span className={`ops-status ops-status-${estado || 'pendiente'}`}>
       {labels[estado] || estado}
+    </span>
+  );
+}
+
+export function FaltanteTag({ count = 0 }) {
+  const n = Number(count) || 0;
+  if (n <= 0) return null;
+  return (
+    <span className="ops-status ops-status-faltante">
+      {n} faltante{n === 1 ? '' : 's'}
     </span>
   );
 }

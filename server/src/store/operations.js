@@ -210,6 +210,12 @@ async function getOrderDetails(orderId, db = pool) {
 }
 
 async function syncItems(db, operacionId, orderId) {
+  const { rows: estadoRows } = await db.query(
+    'select estado from app_operaciones_pedidos where id = $1',
+    [operacionId]
+  );
+  if (!estadoRows[0] || estadoRows[0].estado === 'armado') return;
+
   const detalles = await getOrderDetails(orderId, db);
   const lineas = detalles.map((d) => d.linea);
 
@@ -279,6 +285,7 @@ async function refreshEstado(db, operacionId) {
   const { rows } = await db.query(
     `select count(*)::int as total,
             count(*) filter (where validado)::int as validados,
+            count(*) filter (where faltante)::int as faltantes,
             max(validado_en) as ultimo
        from app_operaciones_items
       where operacion_id = $1`,
@@ -286,12 +293,18 @@ async function refreshEstado(db, operacionId) {
   );
   const total = Number(rows[0]?.total || 0);
   const validados = Number(rows[0]?.validados || 0);
+  const faltantes = Number(rows[0]?.faltantes || 0);
   const ultimo = rows[0]?.ultimo || null;
 
-  if (total > 0 && total === validados) {
+  if (total > 0 && total === validados && faltantes === 0) {
     await db.query(
       `update app_operaciones_pedidos
-          set estado = 'armado', finalizado_en = $1, actualizado_en = now()
+          set estado = 'armado',
+              finalizado_en = $1,
+              armado_parcial = false,
+              autorizado_por = null,
+              autorizado_en = null,
+              actualizado_en = now()
         where id = $2`,
       [ultimo, operacionId]
     );
@@ -300,6 +313,9 @@ async function refreshEstado(db, operacionId) {
       `update app_operaciones_pedidos
           set estado = case when iniciado_en is not null then 'en_proceso' else 'asignado' end,
               finalizado_en = null,
+              armado_parcial = false,
+              autorizado_por = null,
+              autorizado_en = null,
               actualizado_en = now()
         where id = $1`,
       [operacionId]
@@ -328,13 +344,18 @@ const SQL_ORDEN = `
          ap.nombre as asignado_por_nombre,
          o.asignado_en,
          o.iniciado_en,
-         o.finalizado_en
+         o.finalizado_en,
+         o.armado_parcial,
+         o.autorizado_por,
+         au.nombre as autorizado_por_nombre,
+         o.autorizado_en
     from arc_transacciones t
     left join arc_clientes c on c.cli_codigo = t.trn_responsable
     left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
     left join app_operaciones_pedidos o on o.trn_id_auto = t.trn_id_auto
     left join app_operarios op on op.id = o.operario_id
     left join app_operarios ap on ap.id = o.asignado_por
+    left join app_operarios au on au.id = o.autorizado_por
    where t.trn_id_auto = $1
      and t.trn_tipo = 10
      and (t.trn_status in (2, 4) or o.id is not null)
@@ -368,7 +389,11 @@ async function getOrderForActor(orderId, actor) {
               i.validado,
               i.validado_en,
               i.duracion_segundos,
+              i.faltante,
+              i.motivo_faltante,
+              i.faltante_en,
               v.nombre as validado_por_nombre,
+              f.nombre as faltante_por_nombre,
               case
                 when i.validado_en is not null and o.iniciado_en is not null
                 then greatest(0, floor(extract(epoch from (i.validado_en - o.iniciado_en))))::int
@@ -377,6 +402,7 @@ async function getOrderForActor(orderId, actor) {
          from app_operaciones_items i
          join app_operaciones_pedidos o on o.id = i.operacion_id
          left join app_operarios v on v.id = i.validado_por
+         left join app_operarios f on f.id = i.faltante_por
         where i.operacion_id = $1
         order by i.linea`,
       [operacionId]
@@ -397,7 +423,11 @@ async function getOrderForActor(orderId, actor) {
         i.acumulado_segundos === null || i.acumulado_segundos === undefined
           ? null
           : Number(i.acumulado_segundos),
-      validado_por_nombre: i.validado_por_nombre || null
+      validado_por_nombre: i.validado_por_nombre || null,
+      faltante: i.faltante === true,
+      motivo_faltante: i.motivo_faltante || '',
+      faltante_en: i.faltante_en || null,
+      faltante_por_nombre: i.faltante_por_nombre || null
     }));
   } else {
     const detalles = await getOrderDetails(orderId);
@@ -411,7 +441,11 @@ async function getOrderForActor(orderId, actor) {
       validado_en: null,
       duracion_segundos: null,
       acumulado_segundos: null,
-      validado_por_nombre: null
+      validado_por_nombre: null,
+      faltante: false,
+      motivo_faltante: '',
+      faltante_en: null,
+      faltante_por_nombre: null
     }));
   }
 
@@ -444,9 +478,13 @@ async function getOrderForActor(orderId, actor) {
     iniciado_en: iniciado,
     finalizado_en: finalizado,
     duracion_segundos: duracionSegundos(iniciado, finalizado),
+    armado_parcial: h.armado_parcial === true,
+    autorizado_por_nombre: h.autorizado_por_nombre || null,
+    autorizado_en: h.autorizado_en || null,
     items,
     items_total: items.length,
     items_validados: items.filter((i) => i.validado).length,
+    items_faltantes: items.filter((i) => i.faltante).length,
     unidades: items.reduce((s, i) => s + Number(i.cantidad || 0), 0)
   };
 }
@@ -542,7 +580,7 @@ async function validateItem(orderId, itemId, validado, actor) {
     await client.query('begin');
 
     const { rows: opRows } = await client.query(
-      `select o.id, o.operario_id, o.iniciado_en, o.estado
+      `select o.id, o.operario_id, o.iniciado_en, o.estado, o.armado_parcial
          from app_operaciones_pedidos o
         where o.trn_id_auto = $1
         for update`,
@@ -554,6 +592,12 @@ async function validateItem(orderId, itemId, validado, actor) {
       throw error(403, 'Este pedido no está asignado a ti');
     }
     if (!op.iniciado_en) throw error(409, 'Primero inicia el armado del pedido');
+    if (op.armado_parcial) {
+      throw error(
+        409,
+        'El pedido está cerrado como armado parcial. Reábrelo para modificarlo'
+      );
+    }
 
     const { rows: itemRows } = await client.query(
       `select id, validado
@@ -567,7 +611,13 @@ async function validateItem(orderId, itemId, validado, actor) {
     if (validado === true && !itemRows[0].validado) {
       await client.query(
         `update app_operaciones_items
-            set validado = true, validado_por = $1, validado_en = now()
+            set validado = true,
+                validado_por = $1,
+                validado_en = now(),
+                faltante = false,
+                motivo_faltante = null,
+                faltante_por = null,
+                faltante_en = null
           where id = $2`,
         [actor.id, itemId]
       );
@@ -596,7 +646,192 @@ async function validateItem(orderId, itemId, validado, actor) {
   }
 }
 
-async function listOrders({ operarioId = null, estado = '', q: termino = '' } = {}) {
+async function markFaltante(orderId, itemId, faltante, motivo, actor) {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+
+    const { rows: opRows } = await client.query(
+      `select o.id, o.operario_id, o.iniciado_en, o.estado, o.armado_parcial
+         from app_operaciones_pedidos o
+        where o.trn_id_auto = $1
+        for update`,
+      [orderId]
+    );
+    const op = opRows[0];
+    if (!op) throw error(409, 'Primero asigna el pedido a un operario');
+    if (actor.rol !== 'jefe' && Number(op.operario_id) !== Number(actor.id)) {
+      throw error(403, 'Este pedido no está asignado a ti');
+    }
+    if (!op.iniciado_en) throw error(409, 'Primero inicia el armado del pedido');
+    if (op.estado === 'armado') {
+      throw error(409, 'El pedido está cerrado. Reábrelo para modificarlo');
+    }
+
+    const { rows: itemRows } = await client.query(
+      `select id
+         from app_operaciones_items
+        where id = $1 and operacion_id = $2
+        for update`,
+      [itemId, op.id]
+    );
+    if (!itemRows[0]) throw error(404, 'Ítem no encontrado');
+
+    if (faltante === true) {
+      const razon = texto(motivo).slice(0, 300);
+      if (!razon) throw error(400, 'Describe el motivo del faltante');
+      await client.query(
+        `update app_operaciones_items
+            set faltante = true,
+                motivo_faltante = $1,
+                faltante_por = $2,
+                faltante_en = now(),
+                validado = false,
+                validado_por = null,
+                validado_en = null,
+                duracion_segundos = null
+          where id = $3`,
+        [razon, actor.id, itemId]
+      );
+    } else {
+      await client.query(
+        `update app_operaciones_items
+            set faltante = false,
+                motivo_faltante = null,
+                faltante_por = null,
+                faltante_en = null
+          where id = $1`,
+        [itemId]
+      );
+    }
+
+    await recalcItemDurations(client, op.id);
+    await refreshEstado(client, op.id);
+    await client.query('commit');
+
+    return getOrderForActor(orderId, actor);
+  } catch (e) {
+    try {
+      await client.query('rollback');
+    } catch {}
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function authorizePartial(orderId, actor) {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+
+    const { rows: opRows } = await client.query(
+      `select o.id, o.iniciado_en, o.estado, o.armado_parcial
+         from app_operaciones_pedidos o
+        where o.trn_id_auto = $1
+        for update`,
+      [orderId]
+    );
+    const op = opRows[0];
+    if (!op) throw error(409, 'Primero asigna el pedido a un operario');
+    if (op.estado === 'armado' || op.armado_parcial) {
+      throw error(409, 'El pedido ya está cerrado');
+    }
+    if (!op.iniciado_en) throw error(409, 'Primero inicia el armado del pedido');
+
+    const { rows: counts } = await client.query(
+      `select count(*)::int as total,
+              count(*) filter (where validado)::int as validados,
+              count(*) filter (where faltante)::int as faltantes
+         from app_operaciones_items
+        where operacion_id = $1`,
+      [op.id]
+    );
+    const total = Number(counts[0]?.total || 0);
+    const validados = Number(counts[0]?.validados || 0);
+    const faltantes = Number(counts[0]?.faltantes || 0);
+
+    if (total === 0) throw error(400, 'El pedido no tiene ítems');
+    if (faltantes === 0) throw error(400, 'El pedido no tiene faltantes reportados');
+    if (validados + faltantes !== total) {
+      throw error(
+        400,
+        'Aún hay ítems sin validar ni reportar como faltantes'
+      );
+    }
+
+    await client.query(
+      `update app_operaciones_pedidos
+          set estado = 'armado',
+              armado_parcial = true,
+              autorizado_por = $1,
+              autorizado_en = now(),
+              finalizado_en = now(),
+              actualizado_en = now()
+        where id = $2`,
+      [actor.id, op.id]
+    );
+    await client.query('commit');
+
+    return getOrderForActor(orderId, actor);
+  } catch (e) {
+    try {
+      await client.query('rollback');
+    } catch {}
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function reopenPartial(orderId, actor) {
+  const connection = await pool.connect();
+  try {
+    await connection.query('begin');
+
+    const { rows } = await connection.query(
+      `select id, armado_parcial
+         from app_operaciones_pedidos
+        where trn_id_auto = $1
+        for update`,
+      [orderId]
+    );
+    const op = rows[0];
+    if (!op) throw error(404, 'Pedido no encontrado');
+    if (!op.armado_parcial) {
+      throw error(400, 'El pedido no está cerrado como armado parcial');
+    }
+
+    await connection.query(
+      `update app_operaciones_pedidos
+          set estado = 'en_proceso',
+              armado_parcial = false,
+              autorizado_por = null,
+              autorizado_en = null,
+              finalizado_en = null,
+              actualizado_en = now()
+        where id = $1`,
+      [op.id]
+    );
+    await connection.query('commit');
+
+    return getOrderForActor(orderId, actor);
+  } catch (e) {
+    try {
+      await connection.query('rollback');
+    } catch {}
+    throw e;
+  } finally {
+    connection.release();
+  }
+}
+
+async function listOrders({
+  operarioId = null,
+  estado = '',
+  q: termino = '',
+  soloFaltantes = false
+} = {}) {
   const filtro = texto(termino) ? `%${texto(termino)}%` : '';
   const estadoSel = texto(estado);
   const { rows } = await q(
@@ -615,6 +850,7 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
             o.asignado_en,
             o.iniciado_en,
             o.finalizado_en,
+            o.armado_parcial,
             case
               when o.id is not null then
                 (select count(*)::int from app_operaciones_items i where i.operacion_id = o.id)
@@ -625,6 +861,8 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
             end as items_total,
             (select count(*)::int from app_operaciones_items i
               where i.operacion_id = o.id and i.validado) as items_validados,
+            (select count(*)::int from app_operaciones_items i
+              where i.operacion_id = o.id and i.faltante) as items_faltantes,
             (select coalesce(sum(d.dtv_cantidad), 0) from arc_detalletranvtas d
               where d.dtv_operacion_autoincrement = t.trn_autoincrement
                 and d.dtv_documento = t.trn_documento) as unidades
@@ -640,6 +878,9 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
         and ($3::text = ''
              or t.trn_documento ilike $3
              or c.cli_descripcion ilike $3)
+        and ($4::boolean is not true
+             or exists (select 1 from app_operaciones_items f
+                         where f.operacion_id = o.id and f.faltante))
       order by case coalesce(o.estado, 'pendiente')
                  when 'pendiente' then 0
                  when 'asignado' then 1
@@ -648,7 +889,7 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
                end,
                t.trn_fechaemision desc
       limit 300`,
-    [operarioId, estadoSel, filtro]
+    [operarioId, estadoSel, filtro, soloFaltantes === true]
   );
 
   return rows.map((r) => {
@@ -673,6 +914,8 @@ async function listOrders({ operarioId = null, estado = '', q: termino = '' } = 
       },
       items_total: Number(r.items_total || 0),
       items_validados: Number(r.items_validados || 0),
+      items_faltantes: Number(r.items_faltantes || 0),
+      armado_parcial: r.armado_parcial === true,
       unidades: Number(r.unidades || 0),
       asignado_en: r.asignado_en || null,
       iniciado_en: iniciado,
@@ -698,6 +941,10 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
             o.asignado_en,
             o.iniciado_en,
             o.finalizado_en,
+            o.armado_parcial,
+            o.autorizado_por,
+            au.nombre as autorizado_por_nombre,
+            o.autorizado_en,
             case
               when o.iniciado_en is not null
               then greatest(0, floor(extract(epoch from
@@ -707,12 +954,15 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
             (select count(*)::int from app_operaciones_items i
               where i.operacion_id = o.id) as items_total,
             (select count(*)::int from app_operaciones_items i
-              where i.operacion_id = o.id and i.validado) as items_validados
+              where i.operacion_id = o.id and i.validado) as items_validados,
+            (select count(*)::int from app_operaciones_items i
+              where i.operacion_id = o.id and i.faltante) as items_faltantes
        from app_operaciones_pedidos o
        join arc_transacciones t on t.trn_id_auto = o.trn_id_auto
        left join arc_clientes c on c.cli_codigo = t.trn_responsable
        left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
        left join app_operarios op on op.id = o.operario_id
+       left join app_operarios au on au.id = o.autorizado_por
       where o.asignado_en::date between $1::date and $2::date
         and ($3::bigint is null or o.operario_id = $3)
       order by o.asignado_en desc
@@ -729,7 +979,9 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
             i.cantidad,
             i.validado,
             i.validado_en,
-            i.duracion_segundos
+            i.duracion_segundos,
+            i.faltante,
+            i.motivo_faltante
        from app_operaciones_items i
        join app_operaciones_pedidos o on o.id = i.operacion_id
        join arc_transacciones t on t.trn_id_auto = o.trn_id_auto
@@ -750,12 +1002,16 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     operario: p.operario || 'Sin operario',
     operario_id: p.operario_id ? Number(p.operario_id) : null,
     estado: p.estado,
+    armado_parcial: p.armado_parcial === true,
+    autorizado_por_nombre: p.autorizado_por_nombre || null,
+    autorizado_en: p.autorizado_en || null,
     asignado_en: p.asignado_en,
     iniciado_en: p.iniciado_en,
     finalizado_en: p.finalizado_en,
     duracion_segundos: Number(p.duracion_segundos || 0),
     items_total: Number(p.items_total || 0),
-    items_validados: Number(p.items_validados || 0)
+    items_validados: Number(p.items_validados || 0),
+    items_faltantes: Number(p.items_faltantes || 0)
   }));
 
   const itemsMap = items.map((i) => ({
@@ -767,6 +1023,8 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     cantidad: Number(i.cantidad || 0),
     validado: i.validado === true,
     validado_en: i.validado_en || null,
+    faltante: i.faltante === true,
+    motivo_faltante: i.motivo_faltante || '',
     duracion_segundos:
       i.duracion_segundos === null || i.duracion_segundos === undefined
         ? null
@@ -830,8 +1088,10 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     resumen: {
       pedidos: pedidosMap.length,
       armados: armados.length,
+      armados_parciales: armados.filter((p) => p.armado_parcial).length,
       items: pedidosMap.reduce((s, p) => s + p.items_total, 0),
       items_validados: pedidosMap.reduce((s, p) => s + p.items_validados, 0),
+      items_faltantes: pedidosMap.reduce((s, p) => s + p.items_faltantes, 0),
       tiempo_total_segundos: tiempoTotal,
       tiempo_promedio_pedido_segundos: armados.length
         ? Math.round(tiempoTotal / armados.length)
@@ -869,6 +1129,9 @@ export const opsStore = {
   assignOrder,
   startOrder,
   validateItem,
+  markFaltante,
+  authorizePartial,
+  reopenPartial,
   listOrders,
   getReports
 };

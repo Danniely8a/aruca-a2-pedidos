@@ -486,6 +486,151 @@ async function main() {
     check('detalle escrito en arc_detalletranvtas', detalleA2.rows.length === 2, `=${detalleA2.rows.length}`);
     console.log('     fila A2:', JSON.stringify(detalleA2.rows[0]));
 
+    // --- Faltantes y armado parcial autorizado ----------------------------
+    const pedidoFaltante = await req('/api/pedidos', {
+      method: 'POST',
+      token: tCarlos,
+      body: {
+        cliente_id: cli?.id,
+        items: [
+          { producto_id: p1?.id, cantidad: 1, precio: Number(p1?.precio) },
+          { producto_id: p5?.id, cantidad: 1, precio: Number(p5?.precio) || 80 }
+        ]
+      }
+    });
+    check(
+      'crear pedido para faltante → 201',
+      pedidoFaltante.status === 201,
+      JSON.stringify(pedidoFaltante.data)
+    );
+    const idFaltante = pedidoFaltante.data?.pedido?.id;
+
+    const asignadoFaltante = await req(
+      `/api/operaciones/pedidos/${idFaltante}/asignar`,
+      {
+        method: 'POST',
+        token: tOps,
+        body: { operario_id: operarioId }
+      }
+    );
+    check(
+      'asignar pedido de faltante',
+      asignadoFaltante.status === 200,
+      JSON.stringify(asignadoFaltante.data)
+    );
+
+    const iniciadoFaltante = await req(
+      `/api/operaciones/pedidos/${idFaltante}/iniciar`,
+      { method: 'POST', token: tPedro }
+    );
+    const itemsFaltante = iniciadoFaltante.data?.pedido?.items || [];
+    check(
+      'iniciar pedido de faltante',
+      iniciadoFaltante.status === 200 && itemsFaltante.length === 2,
+      JSON.stringify(iniciadoFaltante.data)
+    );
+
+    await req(
+      `/api/operaciones/pedidos/${idFaltante}/items/${itemsFaltante[0]?.id}/validar`,
+      { method: 'POST', token: tPedro, body: { validado: true } }
+    );
+
+    const faltante = await req(
+      `/api/operaciones/pedidos/${idFaltante}/items/${itemsFaltante[1]?.id}/faltante`,
+      {
+        method: 'POST',
+        token: tPedro,
+        body: {
+          faltante: true,
+          motivo: 'Sin existencia en almacén'
+        }
+      }
+    );
+    check(
+      'reportar ítem faltante → pedido en proceso',
+      faltante.status === 200 &&
+        faltante.data.pedido?.items_faltantes === 1 &&
+        faltante.data.pedido?.estado === 'en_proceso',
+      JSON.stringify(faltante.data)
+    );
+
+    const filtroFaltantes = await req(
+      '/api/operaciones/pedidos?faltantes=1',
+      { token: tOps }
+    );
+    check(
+      'filtro de pedidos con faltantes',
+      filtroFaltantes.data.items?.some((p) => p.id === idFaltante),
+      JSON.stringify(filtroFaltantes.data.items)
+    );
+
+    check(
+      'operario no puede autorizar armado parcial → 403',
+      (
+        await req(`/api/operaciones/pedidos/${idFaltante}/armado-parcial`, {
+          method: 'POST',
+          token: tPedro
+        })
+      ).status === 403
+    );
+
+    const parcial = await req(
+      `/api/operaciones/pedidos/${idFaltante}/armado-parcial`,
+      { method: 'POST', token: tOps }
+    );
+    check(
+      'jefe autoriza armado parcial',
+      parcial.status === 200 &&
+        parcial.data.pedido?.armado_parcial === true &&
+        parcial.data.pedido?.estado === 'armado' &&
+        parcial.data.pedido?.items_faltantes === 1,
+      JSON.stringify(parcial.data)
+    );
+
+    const reporteFaltante = await req(
+      '/api/operaciones/reportes?desde=2020-01-01&hasta=2099-12-31',
+      { token: tOps }
+    );
+    check(
+      'reporte muestra armado parcial y faltante',
+      reporteFaltante.data.pedidos?.some(
+        (p) =>
+          p.numero === pedidoFaltante.data?.pedido?.numero &&
+          p.armado_parcial === true
+      ) &&
+        reporteFaltante.data.items?.some(
+          (i) =>
+            i.numero === pedidoFaltante.data?.pedido?.numero &&
+            i.faltante === true
+        ),
+      JSON.stringify(reporteFaltante.data.resumen)
+    );
+
+    const reabierto = await req(
+      `/api/operaciones/pedidos/${idFaltante}/reabrir`,
+      { method: 'POST', token: tOps }
+    );
+    check(
+      'jefe reabre armado parcial',
+      reabierto.status === 200 &&
+        reabierto.data.pedido?.armado_parcial === false &&
+        reabierto.data.pedido?.estado === 'en_proceso',
+      JSON.stringify(reabierto.data)
+    );
+
+    const resuelto = await req(
+      `/api/operaciones/pedidos/${idFaltante}/items/${itemsFaltante[1]?.id}/validar`,
+      { method: 'POST', token: tPedro, body: { validado: true } }
+    );
+    check(
+      'validar ítem faltante resuelve el pedido',
+      resuelto.status === 200 &&
+        resuelto.data.pedido?.items_faltantes === 0 &&
+        resuelto.data.pedido?.armado_parcial === false &&
+        resuelto.data.pedido?.estado === 'armado',
+      JSON.stringify(resuelto.data)
+    );
+
     // --- Precios por lista del cliente (cli_preciodefecto) ---------------
     const cli2 = clientes.data.items.find((x) => x.codigo === 'C-0002');
     const det2 = await req(`/api/clientes/${cli2?.id}`, { token: tAdmin });

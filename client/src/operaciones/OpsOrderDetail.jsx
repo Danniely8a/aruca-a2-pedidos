@@ -5,6 +5,7 @@ import { useOpsAuth } from './OpsAuthContext.jsx';
 import {
   DuracionPedido,
   EstadoOps,
+  FaltanteTag,
   Progreso,
   formatDuration,
   formatFechaHora
@@ -32,6 +33,10 @@ export default function OpsOrderDetail() {
   const [accion, setAccion] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
+  const [faltanteItem, setFaltanteItem] = useState(null);
+  const [motivoFaltante, setMotivoFaltante] = useState('');
+  const [guardandoFaltante, setGuardandoFaltante] = useState(false);
+  const [errorFaltante, setErrorFaltante] = useState('');
 
   const cargar = () => {
     setLoading(true);
@@ -124,6 +129,82 @@ export default function OpsOrderDetail() {
     }
   };
 
+  const abrirFaltante = (item) => {
+    setFaltanteItem(item);
+    setMotivoFaltante('');
+    setErrorFaltante('');
+  };
+
+  const reportarFaltante = async (e) => {
+    e.preventDefault();
+    if (!faltanteItem?.id) return;
+    setGuardandoFaltante(true);
+    setErrorFaltante('');
+    try {
+      await opsPost(
+        `/api/operaciones/pedidos/${id}/items/${faltanteItem.id}/faltante`,
+        { faltante: true, motivo: motivoFaltante }
+      );
+      setFaltanteItem(null);
+      setMotivoFaltante('');
+      setOk('Faltante reportado. El jefe de almacén fue notificado.');
+      await cargar();
+    } catch (err) {
+      setErrorFaltante(err.message);
+    } finally {
+      setGuardandoFaltante(false);
+    }
+  };
+
+  const quitarFaltante = async (item) => {
+    if (!item.id) return;
+    setAccion(true);
+    setError('');
+    setOk('');
+    try {
+      await opsPost(
+        `/api/operaciones/pedidos/${id}/items/${item.id}/faltante`,
+        { faltante: false }
+      );
+      setOk('Faltante retirado. Ya puedes validar el ítem.');
+      await cargar();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAccion(false);
+    }
+  };
+
+  const autorizarParcial = async () => {
+    setAccion(true);
+    setError('');
+    setOk('');
+    try {
+      await opsPost(`/api/operaciones/pedidos/${id}/armado-parcial`, {});
+      setOk('Pedido cerrado como armado parcial.');
+      await cargar();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAccion(false);
+    }
+  };
+
+  const reabrir = async () => {
+    setAccion(true);
+    setError('');
+    setOk('');
+    try {
+      await opsPost(`/api/operaciones/pedidos/${id}/reabrir`, {});
+      setOk('Pedido reabierto para resolver el faltante.');
+      await cargar();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAccion(false);
+    }
+  };
+
   if (loading && !pedido) {
     return (
       <div className="page">
@@ -158,9 +239,10 @@ export default function OpsOrderDetail() {
           </p>
         </div>
         <div className="page-head-tags">
-          <EstadoOps estado={pedido.estado} />
+          <EstadoOps estado={pedido.estado} parcial={pedido.armado_parcial} />
+          <FaltanteTag count={pedido.items_faltantes} />
           <span className="tag tag-transito">A2: {estadoA2(pedido.estado_a2)}</span>
-          {pedido.estado === 'armado' && (
+          {pedido.estado === 'armado' && !pedido.armado_parcial && (
             <span className="tag tag-aprobado">Armado y validado</span>
           )}
         </div>
@@ -173,6 +255,47 @@ export default function OpsOrderDetail() {
         <div className="alert alert-info">
           Asigna este pedido para crear las tareas de armado y poder validar cada
           ítem.
+        </div>
+      )}
+
+      {pedido.armado_parcial && (
+        <div className="alert alert-warn ops-faltante-alert">
+          <div>
+            <strong>Armado parcial autorizado.</strong> Faltan{' '}
+            {pedido.items_faltantes} ítem
+            {pedido.items_faltantes === 1 ? '' : 's'} por resolver.
+            {pedido.autorizado_por_nombre
+              ? ` Autorizado por ${pedido.autorizado_por_nombre}.`
+              : ''}
+          </div>
+          {permisos.reabrir && (
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={reabrir}
+              disabled={accion}
+            >
+              Reabrir pedido
+            </button>
+          )}
+        </div>
+      )}
+
+      {!pedido.armado_parcial && pedido.items_faltantes > 0 && (
+        <div className="alert alert-warn ops-faltante-alert">
+          <div>
+            <strong>Hay {pedido.items_faltantes} ítem(s) faltante(s).</strong>{' '}
+            El pedido no se cerrará como armado hasta resolverlos, salvo que el
+            jefe autorice el armado parcial.
+          </div>
+          {permisos.autorizar_parcial && (
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={autorizarParcial}
+              disabled={accion}
+            >
+              Autorizar armado parcial
+            </button>
+          )}
         </div>
       )}
 
@@ -261,6 +384,18 @@ export default function OpsOrderDetail() {
                 />
               </strong>
             </div>
+            {pedido.armado_parcial && (
+              <>
+                <div>
+                  <span>Autorizado por</span>
+                  <strong>{pedido.autorizado_por_nombre || '—'}</strong>
+                </div>
+                <div>
+                  <span>Autorizado</span>
+                  <strong>{formatFechaHora(pedido.autorizado_en)}</strong>
+                </div>
+              </>
+            )}
           </div>
 
           <Progreso total={pedido.items_total} validados={pedido.items_validados} />
@@ -348,16 +483,33 @@ export default function OpsOrderDetail() {
                 {pedido.items.map((item) => (
                   <tr
                     key={item.id || item.linea}
-                    className={item.validado ? 'ops-item-validado' : ''}
+                    className={
+                      item.validado
+                        ? 'ops-item-validado'
+                        : item.faltante
+                          ? 'ops-item-faltante'
+                          : ''
+                    }
                   >
                     <td>{item.linea}</td>
                     <td>
                       <strong>{item.codigo}</strong>
                     </td>
-                    <td>{item.descripcion}</td>
+                    <td>
+                      {item.descripcion}
+                      {item.faltante && item.motivo_faltante && (
+                        <div className="ops-item-motivo">
+                          Motivo: {item.motivo_faltante}
+                        </div>
+                      )}
+                    </td>
                     <td className="right">{item.cantidad}</td>
                     <td>
-                      {item.validado ? (
+                      {item.faltante ? (
+                        <span className="ops-status ops-status-faltante">
+                          Faltante
+                        </span>
+                      ) : item.validado ? (
                         <span className="ops-status ops-status-armado">Validado</span>
                       ) : (
                         <span className="ops-status ops-status-pendiente">Pendiente</span>
@@ -365,9 +517,30 @@ export default function OpsOrderDetail() {
                     </td>
                     <td>{formatDuration(item.duracion_segundos)}</td>
                     <td>{formatDuration(item.acumulado_segundos)}</td>
-                    <td>{item.validado_por_nombre || '—'}</td>
                     <td>
-                      {item.validado ? (
+                      {item.faltante
+                        ? item.faltante_por_nombre || '—'
+                        : item.validado_por_nombre || '—'}
+                    </td>
+                    <td>
+                      {item.faltante ? (
+                        <div className="ops-item-actions">
+                          <button
+                            className="link"
+                            disabled={!permisos.faltante || accion}
+                            onClick={() => quitarFaltante(item)}
+                          >
+                            Quitar faltante
+                          </button>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            disabled={!permisos.validar || accion}
+                            onClick={() => validar(item, true)}
+                          >
+                            Validar
+                          </button>
+                        </div>
+                      ) : item.validado ? (
                         <button
                           className="link"
                           disabled={!permisos.validar || accion}
@@ -376,13 +549,22 @@ export default function OpsOrderDetail() {
                           Quitar
                         </button>
                       ) : (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          disabled={!permisos.validar || !item.id || accion}
-                          onClick={() => validar(item, true)}
-                        >
-                          Validar
-                        </button>
+                        <div className="ops-item-actions">
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            disabled={!permisos.faltante || !item.id || accion}
+                            onClick={() => abrirFaltante(item)}
+                          >
+                            Faltante
+                          </button>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            disabled={!permisos.validar || !item.id || accion}
+                            onClick={() => validar(item, true)}
+                          >
+                            Validar
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -394,19 +576,30 @@ export default function OpsOrderDetail() {
             {pedido.items.map((item) => (
               <article
                 key={item.id || item.linea}
-                className={`ops-item-card ${item.validado ? 'validado' : ''}`}
+                className={`ops-item-card ${item.validado ? 'validado' : ''} ${
+                  item.faltante ? 'faltante' : ''
+                }`}
               >
                 <div className="ops-item-card-top">
                   <div>
                     <span className="ops-item-code">{item.codigo}</span>
                     <strong>{item.descripcion}</strong>
+                    {item.faltante && item.motivo_faltante && (
+                      <div className="ops-item-motivo">
+                        Motivo: {item.motivo_faltante}
+                      </div>
+                    )}
                   </div>
                   <span className="ops-item-qty">×{item.cantidad}</span>
                 </div>
                 <div className="ops-item-card-meta">
                   <div>
                     <span>Estado</span>
-                    {item.validado ? (
+                    {item.faltante ? (
+                      <span className="ops-status ops-status-faltante">
+                        Faltante
+                      </span>
+                    ) : item.validado ? (
                       <span className="ops-status ops-status-armado">Validado</span>
                     ) : (
                       <span className="ops-status ops-status-pendiente">Pendiente</span>
@@ -423,11 +616,32 @@ export default function OpsOrderDetail() {
                 </div>
                 <div className="ops-item-card-foot">
                   <span className="muted ops-small">
-                    {item.validado_por_nombre
-                      ? `Validado por ${item.validado_por_nombre}`
-                      : `Línea ${item.linea}`}
+                    {item.faltante
+                      ? `Reportado por ${
+                          item.faltante_por_nombre || 'operario'
+                        }`
+                      : item.validado_por_nombre
+                        ? `Validado por ${item.validado_por_nombre}`
+                        : `Línea ${item.linea}`}
                   </span>
-                  {item.validado ? (
+                  {item.faltante ? (
+                    <div className="ops-item-actions">
+                      <button
+                        className="link"
+                        disabled={!permisos.faltante || accion}
+                        onClick={() => quitarFaltante(item)}
+                      >
+                        Quitar faltante
+                      </button>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        disabled={!permisos.validar || accion}
+                        onClick={() => validar(item, true)}
+                      >
+                        Validar
+                      </button>
+                    </div>
+                  ) : item.validado ? (
                     <button
                       className="link"
                       disabled={!permisos.validar || accion}
@@ -436,13 +650,22 @@ export default function OpsOrderDetail() {
                       Quitar
                     </button>
                   ) : (
-                    <button
-                      className="btn btn-sm btn-primary"
-                      disabled={!permisos.validar || !item.id || accion}
-                      onClick={() => validar(item, true)}
-                    >
-                      Validar
-                    </button>
+                    <div className="ops-item-actions">
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        disabled={!permisos.faltante || !item.id || accion}
+                        onClick={() => abrirFaltante(item)}
+                      >
+                        Faltante
+                      </button>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        disabled={!permisos.validar || !item.id || accion}
+                        onClick={() => validar(item, true)}
+                      >
+                        Validar
+                      </button>
+                    </div>
                   )}
                 </div>
               </article>
@@ -451,6 +674,67 @@ export default function OpsOrderDetail() {
           </>
         )}
       </section>
+
+      {faltanteItem && (
+        <div className="modal-backdrop" onClick={() => setFaltanteItem(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>Reportar producto faltante</h3>
+                <p className="muted">
+                  {faltanteItem.codigo} · {faltanteItem.descripcion}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setFaltanteItem(null)}
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={reportarFaltante}>
+              <div className="modal-body">
+                {errorFaltante && (
+                  <div className="alert alert-error">{errorFaltante}</div>
+                )}
+                <label className="field">
+                  <span>¿Qué falta o qué pasó?</span>
+                  <textarea
+                    className="input ops-textarea"
+                    rows="3"
+                    value={motivoFaltante}
+                    onChange={(e) => setMotivoFaltante(e.target.value)}
+                    placeholder="Ej.: no hay existencia en almacén, producto dañado, código incorrecto…"
+                    autoFocus
+                    required
+                  />
+                </label>
+                <p className="muted ops-small">
+                  El pedido quedará en proceso con este ítem marcado como
+                  faltante. El jefe de almacén podrá resolverlo o autorizar un
+                  armado parcial.
+                </p>
+              </div>
+              <div className="modal-foot">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setFaltanteItem(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={guardandoFaltante || !motivoFaltante.trim()}
+                >
+                  {guardandoFaltante ? 'Guardando…' : 'Reportar faltante'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

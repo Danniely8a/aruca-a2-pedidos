@@ -101,6 +101,9 @@ export async function ensureAppSchema() {
       asignado_en    timestamptz not null default now(),
       iniciado_en    timestamptz,
       finalizado_en  timestamptz,
+      armado_parcial boolean not null default false,
+      autorizado_por bigint references app_operarios(id) on delete set null,
+      autorizado_en  timestamptz,
       creado_en      timestamptz not null default now(),
       actualizado_en timestamptz not null default now()
     )
@@ -123,11 +126,41 @@ export async function ensureAppSchema() {
       validado_por      bigint references app_operarios(id) on delete set null,
       validado_en       timestamptz,
       duracion_segundos integer,
+      faltante          boolean not null default false,
+      motivo_faltante   text,
+      faltante_por      bigint references app_operarios(id) on delete set null,
+      faltante_en       timestamptz,
       creado_en         timestamptz not null default now(),
       unique (operacion_id, linea)
     )
   `);
   await pool.query(
     'create index if not exists app_operaciones_items_operacion_idx on app_operaciones_items (operacion_id)'
+  );
+
+  // Migraciones idempotentes para instalaciones que ya tenían las tablas.
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists armado_parcial boolean not null default false'
+  );
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists autorizado_por bigint references app_operarios(id) on delete set null'
+  );
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists autorizado_en timestamptz'
+  );
+  await pool.query(
+    'alter table app_operaciones_items add column if not exists faltante boolean not null default false'
+  );
+  await pool.query(
+    'alter table app_operaciones_items add column if not exists motivo_faltante text'
+  );
+  await pool.query(
+    'alter table app_operaciones_items add column if not exists faltante_por bigint references app_operarios(id) on delete set null'
+  );
+  await pool.query(
+    'alter table app_operaciones_items add column if not exists faltante_en timestamptz'
+  );
+  await pool.query(
+    'create index if not exists app_operaciones_items_faltante_idx on app_operaciones_items (operacion_id) where faltante'
   );
 }

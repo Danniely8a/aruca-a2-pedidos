@@ -6,6 +6,7 @@ import OrderCard from './components/OrderCard.jsx';
 import {
   DuracionPedido,
   EstadoOps,
+  FaltanteTag,
   formatDuration,
   formatFecha,
   formatFechaHora
@@ -62,7 +63,8 @@ export default function OpsHome() {
       enProceso,
       armados: armados.length,
       porValidar,
-      tiempoPromedio
+      tiempoPromedio,
+      faltantes: items.filter((i) => Number(i.items_faltantes) > 0).length
     };
   }, [items]);
 
@@ -90,6 +92,13 @@ export default function OpsHome() {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {stats.faltantes > 0 && (
+        <div className="alert alert-warn">
+          {stats.faltantes} pedido{stats.faltantes === 1 ? '' : 's'} con
+          productos faltantes. Revísalo{stats.faltantes === 1 ? '' : 's'} en el
+          detalle del pedido.
+        </div>
+      )}
 
       <div className="cards dashboard-stats">
         {esJefe && (
@@ -183,7 +192,11 @@ export default function OpsHome() {
                       </td>
                       <td>{p.vendedor?.nombre || '—'}</td>
                       <td>
-                        <EstadoOps estado={p.estado} />
+                        <EstadoOps
+                          estado={p.estado}
+                          parcial={p.armado_parcial}
+                        />
+                        <FaltanteTag count={p.items_faltantes} />
                       </td>
                       {esJefe && <td>{p.operario_nombre || '—'}</td>}
                       <td>

@@ -2776,6 +2776,14 @@ p {
   background: #dcfce7;
   color: #15803d;
 }
+.ops-status-parcial {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.ops-status-faltante {
+  background: #fee2e2;
+  color: #b91c1c;
+}
 .ops-timer {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -2840,6 +2848,43 @@ p {
 }
 .ops-item-validado {
   background: #f0fdf4;
+}
+.ops-item-faltante {
+  background: #fff7ed;
+}
+.ops-team-span {
+  display: block;
+}
+.ops-item-motivo {
+  margin-top: 4px;
+  color: #b91c1c;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: normal;
+}
+.ops-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ops-faltante-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ops-textarea {
+  min-height: 90px;
+  resize: vertical;
+  font: inherit;
+}
+.ops-chip-faltante.active {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
 }
 .ops-items-table td {
   white-space: nowrap;
@@ -2933,6 +2978,13 @@ p {
   justify-content: space-between;
   gap: 10px;
 }
+.ops-order-card-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
 .ops-order-card-link {
   display: flex;
   flex-direction: column;
@@ -3017,6 +3069,10 @@ p {
 .ops-item-card.validado {
   border-color: #bbf7d0;
   background: #f0fdf4;
+}
+.ops-item-card.faltante {
+  border-color: #fecaca;
+  background: #fff7ed;
 }
 .ops-item-card-top {
   display: flex;

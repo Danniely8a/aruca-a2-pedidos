@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { opsApi } from './api.js';
-import { EstadoOps, formatDuration, formatFecha, formatFechaHora } from './ui.jsx';
+import {
+  EstadoOps,
+  FaltanteTag,
+  formatDuration,
+  formatFecha,
+  formatFechaHora
+} from './ui.jsx';
 
 const ymd = (d) => {
   const y = d.getFullYear();
@@ -111,6 +117,10 @@ export default function OpsReports() {
           <div>
             <span>Pedidos armados</span>
             <strong>{r.armados ?? 0}</strong>
+            <span className="ops-small">
+              {r.armados_parciales ?? 0} parcial
+              {(r.armados_parciales ?? 0) === 1 ? '' : 'es'}
+            </span>
           </div>
         </div>
         <div className="card stat stat-card">
@@ -134,6 +144,10 @@ export default function OpsReports() {
             <strong>
               {r.items_validados ?? 0}/{r.items ?? 0}
             </strong>
+            <span className="ops-small">
+              {r.items_faltantes ?? 0} faltante
+              {(r.items_faltantes ?? 0) === 1 ? '' : 's'}
+            </span>
           </div>
         </div>
       </div>
@@ -179,7 +193,11 @@ export default function OpsReports() {
                     <td data-label="Vendedor">{p.vendedor || '—'}</td>
                     <td data-label="Operario">{p.operario}</td>
                     <td data-label="Estado">
-                      <EstadoOps estado={p.estado} />
+                      <EstadoOps
+                        estado={p.estado}
+                        parcial={p.armado_parcial}
+                      />
+                      <FaltanteTag count={p.items_faltantes} />
                     </td>
                     <td data-label="Asignado">{formatFechaHora(p.asignado_en)}</td>
                     <td data-label="Inicio">{formatFechaHora(p.iniciado_en)}</td>
@@ -233,10 +251,21 @@ export default function OpsReports() {
                     </td>
                     <td data-label="Operario">{i.operario}</td>
                     <td data-label="Código">{i.codigo}</td>
-                    <td data-label="Producto">{i.descripcion}</td>
+                    <td data-label="Producto">
+                      {i.descripcion}
+                      {i.faltante && i.motivo_faltante && (
+                        <div className="ops-item-motivo">
+                          Motivo: {i.motivo_faltante}
+                        </div>
+                      )}
+                    </td>
                     <td className="right" data-label="Cantidad">{i.cantidad}</td>
                     <td data-label="Estado">
-                      {i.validado ? (
+                      {i.faltante ? (
+                        <span className="ops-status ops-status-faltante">
+                          Faltante
+                        </span>
+                      ) : i.validado ? (
                         <span className="ops-status ops-status-armado">Validado</span>
                       ) : (
                         <span className="ops-status ops-status-pendiente">Pendiente</span>

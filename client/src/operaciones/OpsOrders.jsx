@@ -6,6 +6,7 @@ import OrderCard from './components/OrderCard.jsx';
 import {
   DuracionPedido,
   EstadoOps,
+  FaltanteTag,
   formatFecha,
   formatFechaHora
 } from './ui.jsx';
@@ -101,6 +102,7 @@ export default function OpsOrders() {
   const [q, setQ] = useState('');
   const [estado, setEstado] = useState('');
   const [operarioFiltro, setOperarioFiltro] = useState('');
+  const [soloFaltantes, setSoloFaltantes] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
@@ -113,6 +115,7 @@ export default function OpsOrders() {
     if (q) params.set('q', q);
     if (estado) params.set('estado', estado);
     if (esJefe && operarioFiltro) params.set('operario_id', operarioFiltro);
+    if (soloFaltantes) params.set('faltantes', '1');
     return opsApi(`/api/operaciones/pedidos?${params.toString()}`)
       .then((d) => setItems(d.items || []))
       .catch((e) => setError(e.message))
@@ -130,7 +133,7 @@ export default function OpsOrders() {
     const t = setTimeout(cargar, q ? 220 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, estado, operarioFiltro, esJefe]);
+  }, [q, estado, operarioFiltro, esJefe, soloFaltantes]);
 
   useEffect(() => {
     const refrescar = () => {
@@ -143,7 +146,7 @@ export default function OpsOrders() {
       document.removeEventListener('visibilitychange', refrescar);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, estado, operarioFiltro, esJefe]);
+  }, [q, estado, operarioFiltro, esJefe, soloFaltantes]);
 
   const activos = useMemo(() => operarios.filter((o) => o.activo), [operarios]);
 
@@ -216,6 +219,13 @@ export default function OpsOrders() {
             {c.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={`chip ops-chip-faltante ${soloFaltantes ? 'active' : ''}`}
+          onClick={() => setSoloFaltantes((v) => !v)}
+        >
+          Con faltantes
+        </button>
       </div>
 
       <section className="card ops-list-card">
@@ -280,7 +290,11 @@ export default function OpsOrders() {
                       )}
                     </td>
                     <td>
-                      <EstadoOps estado={p.estado} />
+                      <EstadoOps
+                        estado={p.estado}
+                        parcial={p.armado_parcial}
+                      />
+                      <FaltanteTag count={p.items_faltantes} />
                     </td>
                     <td>
                       <DuracionPedido
