@@ -767,9 +767,10 @@ export default function OpsOrderDetail() {
                   />
                 </label>
                 <p className="muted ops-small">
-                  El pedido quedará en proceso con este ítem marcado como
-                  faltante. El jefe de almacén podrá resolverlo o autorizar un
-                  armado parcial.
+                  Este ítem quedará marcado como faltante. El pedido se cierra
+                  como armado con la alerta y el jefe de almacén debe validarlo
+                  antes de totalizar; el faltante aparece como pendiente en la
+                  nota de entrega.
                 </p>
               </div>
               <div className="modal-foot">
