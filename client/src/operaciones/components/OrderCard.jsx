@@ -3,6 +3,7 @@ import {
   DuracionPedido,
   EstadoOps,
   FaltanteTag,
+  formatDuration,
   formatFecha,
   formatFechaHora
 } from '../ui.jsx';
@@ -18,10 +19,7 @@ export default function OrderCard({ pedido, esJefe, onAsignar }) {
           <span>{formatFecha(pedido.fecha)}</span>
         </Link>
         <div className="ops-order-card-tags">
-          <EstadoOps
-            estado={pedido.estado}
-            parcial={pedido.armado_parcial}
-          />
+          <EstadoOps fase={pedido.fase} />
           <FaltanteTag count={pedido.items_faltantes} />
         </div>
       </div>
@@ -57,7 +55,7 @@ export default function OrderCard({ pedido, esJefe, onAsignar }) {
           </strong>
         </div>
         <div>
-          <span>Tiempo</span>
+          <span>Preparación</span>
           <strong>
             <DuracionPedido
               iniciado_en={pedido.iniciado_en}
@@ -66,6 +64,18 @@ export default function OrderCard({ pedido, esJefe, onAsignar }) {
             />
           </strong>
         </div>
+        {pedido.validado_en && (
+          <div>
+            <span>Validación</span>
+            <strong>{formatDuration(pedido.tiempo_validacion_segundos)}</strong>
+          </div>
+        )}
+        {pedido.entregado_en && (
+          <div>
+            <span>Entrega</span>
+            <strong>{formatDuration(pedido.tiempo_entrega_segundos)}</strong>
+          </div>
+        )}
       </div>
 
       <div className="ops-order-card-foot">

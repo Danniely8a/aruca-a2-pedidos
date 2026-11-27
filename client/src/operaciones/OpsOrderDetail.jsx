@@ -175,13 +175,13 @@ export default function OpsOrderDetail() {
     }
   };
 
-  const autorizarParcial = async () => {
+  const validarJefe = async () => {
     setAccion(true);
     setError('');
     setOk('');
     try {
-      await opsPost(`/api/operaciones/pedidos/${id}/armado-parcial`, {});
-      setOk('Pedido cerrado como armado parcial.');
+      await opsPost(`/api/operaciones/pedidos/${id}/validar-jefe`, {});
+      setOk('Pedido validado por el jefe de almacén.');
       await cargar();
     } catch (err) {
       setError(err.message);
@@ -190,17 +190,15 @@ export default function OpsOrderDetail() {
     }
   };
 
-  const reabrir = async () => {
+  const totalizar = async () => {
     setAccion(true);
     setError('');
     setOk('');
     try {
-      await opsPost(`/api/operaciones/pedidos/${id}/reabrir`, {});
-      setOk('Pedido reabierto para resolver el faltante.');
-      await cargar();
+      await opsPost(`/api/operaciones/pedidos/${id}/totalizar`, {});
+      navigate(`/operaciones/pedidos/${id}/nota`);
     } catch (err) {
       setError(err.message);
-    } finally {
       setAccion(false);
     }
   };
@@ -239,12 +237,9 @@ export default function OpsOrderDetail() {
           </p>
         </div>
         <div className="page-head-tags">
-          <EstadoOps estado={pedido.estado} parcial={pedido.armado_parcial} />
+          <EstadoOps fase={pedido.fase} />
           <FaltanteTag count={pedido.items_faltantes} />
           <span className="tag tag-transito">A2: {estadoA2(pedido.estado_a2)}</span>
-          {pedido.estado === 'armado' && !pedido.armado_parcial && (
-            <span className="tag tag-aprobado">Armado y validado</span>
-          )}
         </div>
       </div>
 
@@ -258,44 +253,75 @@ export default function OpsOrderDetail() {
         </div>
       )}
 
-      {pedido.armado_parcial && (
+      {pedido.fase === 'armado' && (
         <div className="alert alert-warn ops-faltante-alert">
           <div>
-            <strong>Armado parcial autorizado.</strong> Faltan{' '}
-            {pedido.items_faltantes} ítem
-            {pedido.items_faltantes === 1 ? '' : 's'} por resolver.
-            {pedido.autorizado_por_nombre
-              ? ` Autorizado por ${pedido.autorizado_por_nombre}.`
+            <strong>Pedido armado.</strong>{' '}
+            {pedido.items_faltantes > 0
+              ? `Quedan ${pedido.items_faltantes} ítem(s) faltante(s); se marcarán como pendientes en la nota. `
               : ''}
+            Falta la validación del jefe de almacén.
           </div>
-          {permisos.reabrir && (
+          {permisos.validar_jefe && (
             <button
-              className="btn btn-sm btn-ghost"
-              onClick={reabrir}
+              className="btn btn-sm btn-primary"
+              onClick={validarJefe}
               disabled={accion}
             >
-              Reabrir pedido
+              Validar pedido
             </button>
           )}
         </div>
       )}
 
-      {!pedido.armado_parcial && pedido.items_faltantes > 0 && (
-        <div className="alert alert-warn ops-faltante-alert">
+      {pedido.fase === 'validado' && (
+        <div className="alert alert-info ops-faltante-alert">
           <div>
-            <strong>Hay {pedido.items_faltantes} ítem(s) faltante(s).</strong>{' '}
-            El pedido no se cerrará como armado hasta resolverlos, salvo que el
-            jefe autorice el armado parcial.
+            <strong>Pedido validado.</strong>{' '}
+            {pedido.validado_por_nombre
+              ? `Validado por ${pedido.validado_por_nombre}. `
+              : ''}
+            Listo para totalizar y emitir la nota de entrega.
           </div>
-          {permisos.autorizar_parcial && (
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={autorizarParcial}
-              disabled={accion}
-            >
-              Autorizar armado parcial
-            </button>
+          {(permisos.nota || permisos.totalizar) && (
+            <div className="ops-item-actions">
+              {permisos.nota && (
+                <Link
+                  className="btn btn-sm btn-ghost"
+                  to={`/operaciones/pedidos/${pedido.id}/nota`}
+                >
+                  Nota de entrega
+                </Link>
+              )}
+              {permisos.totalizar && (
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={totalizar}
+                  disabled={accion}
+                >
+                  Totalizar pedido
+                </button>
+              )}
+            </div>
           )}
+        </div>
+      )}
+
+      {pedido.fase === 'entregado' && (
+        <div className="alert alert-info ops-faltante-alert">
+          <div>
+            <strong>Pedido entregado.</strong>{' '}
+            {pedido.entregado_por_nombre
+              ? `Entregado por ${pedido.entregado_por_nombre}. `
+              : ''}
+            La nota de entrega está disponible.
+          </div>
+          <Link
+            className="btn btn-sm btn-primary"
+            to={`/operaciones/pedidos/${pedido.id}/nota`}
+          >
+            Ver nota de entrega
+          </Link>
         </div>
       )}
 
@@ -371,11 +397,11 @@ export default function OpsOrderDetail() {
               <strong>{formatFechaHora(pedido.iniciado_en)}</strong>
             </div>
             <div>
-              <span>Fin</span>
+              <span>Fin preparación</span>
               <strong>{formatFechaHora(pedido.finalizado_en)}</strong>
             </div>
             <div>
-              <span>Tiempo total</span>
+              <span>Tiempo preparación</span>
               <strong>
                 <DuracionPedido
                   iniciado_en={pedido.iniciado_en}
@@ -384,15 +410,45 @@ export default function OpsOrderDetail() {
                 />
               </strong>
             </div>
-            {pedido.armado_parcial && (
+            {pedido.validado_en && (
               <>
                 <div>
-                  <span>Autorizado por</span>
-                  <strong>{pedido.autorizado_por_nombre || '—'}</strong>
+                  <span>Validado por</span>
+                  <strong>{pedido.validado_por_nombre || '—'}</strong>
                 </div>
                 <div>
-                  <span>Autorizado</span>
-                  <strong>{formatFechaHora(pedido.autorizado_en)}</strong>
+                  <span>Validado</span>
+                  <strong>{formatFechaHora(pedido.validado_en)}</strong>
+                </div>
+                <div>
+                  <span>Tiempo validación</span>
+                  <strong>
+                    {formatDuration(pedido.tiempo_validacion_segundos)}
+                  </strong>
+                </div>
+              </>
+            )}
+            {pedido.entregado_en && (
+              <>
+                <div>
+                  <span>Entregado por</span>
+                  <strong>{pedido.entregado_por_nombre || '—'}</strong>
+                </div>
+                <div>
+                  <span>Entregado</span>
+                  <strong>{formatFechaHora(pedido.entregado_en)}</strong>
+                </div>
+                <div>
+                  <span>Tiempo entrega</span>
+                  <strong>
+                    {formatDuration(pedido.tiempo_entrega_segundos)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Tiempo total</span>
+                  <strong>
+                    {formatDuration(pedido.tiempo_total_segundos)}
+                  </strong>
                 </div>
               </>
             )}

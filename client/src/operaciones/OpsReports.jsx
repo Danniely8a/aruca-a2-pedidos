@@ -115,34 +115,37 @@ export default function OpsReports() {
         <div className="card stat stat-card">
           <span className="stat-icon stat-icon-blue">PE</span>
           <div>
-            <span>Pedidos armados</span>
-            <strong>{r.armados ?? 0}</strong>
+            <span>Pedidos entregados</span>
+            <strong>{r.entregados ?? 0}</strong>
             <span className="ops-small">
-              {r.armados_parciales ?? 0} parcial
-              {(r.armados_parciales ?? 0) === 1 ? '' : 'es'}
+              {r.armados ?? 0} armados · {r.validados ?? 0} validados
             </span>
           </div>
         </div>
         <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-green">TP</span>
+          <span className="stat-icon stat-icon-green">PP</span>
           <div>
-            <span>Promedio por pedido</span>
-            <strong>{formatDuration(r.tiempo_promedio_pedido_segundos)}</strong>
-          </div>
-        </div>
-        <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-amber">TI</span>
-          <div>
-            <span>Promedio por ítem</span>
-            <strong>{formatDuration(r.tiempo_promedio_item_segundos)}</strong>
-          </div>
-        </div>
-        <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-violet">IV</span>
-          <div>
-            <span>Ítems validados</span>
+            <span>Prom. preparación</span>
             <strong>
-              {r.items_validados ?? 0}/{r.items ?? 0}
+              {formatDuration(r.tiempo_promedio_preparacion_segundos)}
+            </strong>
+          </div>
+        </div>
+        <div className="card stat stat-card">
+          <span className="stat-icon stat-icon-violet">PV</span>
+          <div>
+            <span>Prom. validación</span>
+            <strong>
+              {formatDuration(r.tiempo_promedio_validacion_segundos)}
+            </strong>
+          </div>
+        </div>
+        <div className="card stat stat-card">
+          <span className="stat-icon stat-icon-amber">PE</span>
+          <div>
+            <span>Prom. entrega</span>
+            <strong>
+              {formatDuration(r.tiempo_promedio_entrega_segundos)}
             </strong>
             <span className="ops-small">
               {r.items_faltantes ?? 0} faltante
@@ -193,10 +196,7 @@ export default function OpsReports() {
                     <td data-label="Vendedor">{p.vendedor || '—'}</td>
                     <td data-label="Operario">{p.operario}</td>
                     <td data-label="Estado">
-                      <EstadoOps
-                        estado={p.estado}
-                        parcial={p.armado_parcial}
-                      />
+                      <EstadoOps fase={p.fase} />
                       <FaltanteTag count={p.items_faltantes} />
                     </td>
                     <td data-label="Asignado">{formatFechaHora(p.asignado_en)}</td>
@@ -204,6 +204,16 @@ export default function OpsReports() {
                     <td data-label="Fin">{formatFechaHora(p.finalizado_en)}</td>
                     <td data-label="Tiempo">
                       <strong>{formatDuration(p.duracion_segundos)}</strong>
+                      {p.validado_en && (
+                        <div className="muted ops-small">
+                          Validación {formatDuration(p.tiempo_validacion_segundos)}
+                        </div>
+                      )}
+                      {p.entregado_en && (
+                        <div className="muted ops-small">
+                          Entrega {formatDuration(p.tiempo_entrega_segundos)}
+                        </div>
+                      )}
                     </td>
                     <td data-label="Ítems">
                       {p.items_validados}/{p.items_total}

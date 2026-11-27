@@ -7,6 +7,7 @@ import {
   DuracionPedido,
   EstadoOps,
   FaltanteTag,
+  formatDuration,
   formatFecha,
   formatFechaHora
 } from './ui.jsx';
@@ -155,7 +156,9 @@ export default function OpsOrders() {
     { value: 'pendiente', label: 'Por asignar' },
     { value: 'asignado', label: 'Asignados' },
     { value: 'en_proceso', label: 'En proceso' },
-    { value: 'armado', label: 'Armados' }
+    { value: 'armado', label: 'Armados' },
+    { value: 'validado', label: 'Validados' },
+    { value: 'entregado', label: 'Entregados' }
   ];
 
   const asignado = () => {
@@ -290,10 +293,7 @@ export default function OpsOrders() {
                       )}
                     </td>
                     <td>
-                      <EstadoOps
-                        estado={p.estado}
-                        parcial={p.armado_parcial}
-                      />
+                      <EstadoOps fase={p.fase} />
                       <FaltanteTag count={p.items_faltantes} />
                     </td>
                     <td>
@@ -302,6 +302,16 @@ export default function OpsOrders() {
                         finalizado_en={p.finalizado_en}
                         duracion_segundos={p.duracion_segundos}
                       />
+                      {p.validado_en && (
+                        <div className="muted ops-small">
+                          Validación {formatDuration(p.tiempo_validacion_segundos)}
+                        </div>
+                      )}
+                      {p.entregado_en && (
+                        <div className="muted ops-small">
+                          Entrega {formatDuration(p.tiempo_entrega_segundos)}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div className="ops-row-actions">

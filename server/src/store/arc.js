@@ -1106,6 +1106,7 @@ export const arcStore = {
       ...pedido,
       detalles: detalle.map((d) => ({
         id: Number(d.id),
+        linea: Number(d.linea),
         producto_id: null,
         cantidad: Number(d.cantidad),
         precio: Number(d.precio || 0),

@@ -486,7 +486,7 @@ async function main() {
     check('detalle escrito en arc_detalletranvtas', detalleA2.rows.length === 2, `=${detalleA2.rows.length}`);
     console.log('     fila A2:', JSON.stringify(detalleA2.rows[0]));
 
-    // --- Faltantes y armado parcial autorizado ----------------------------
+    // --- Faltantes, validación del jefe y nota de entrega ----------------
     const pedidoFaltante = await req('/api/pedidos', {
       method: 'POST',
       token: tCarlos,
@@ -547,10 +547,11 @@ async function main() {
       }
     );
     check(
-      'reportar ítem faltante → pedido en proceso',
+      'reportar ítem faltante cierra el pedido como armado',
       faltante.status === 200 &&
         faltante.data.pedido?.items_faltantes === 1 &&
-        faltante.data.pedido?.estado === 'en_proceso',
+        faltante.data.pedido?.estado === 'armado' &&
+        faltante.data.pedido?.fase === 'armado',
       JSON.stringify(faltante.data)
     );
 
@@ -565,26 +566,36 @@ async function main() {
     );
 
     check(
-      'operario no puede autorizar armado parcial → 403',
+      'operario no puede validar como jefe → 403',
       (
-        await req(`/api/operaciones/pedidos/${idFaltante}/armado-parcial`, {
+        await req(`/api/operaciones/pedidos/${idFaltante}/validar-jefe`, {
           method: 'POST',
           token: tPedro
         })
       ).status === 403
     );
 
-    const parcial = await req(
-      `/api/operaciones/pedidos/${idFaltante}/armado-parcial`,
+    const validadoJefe = await req(
+      `/api/operaciones/pedidos/${idFaltante}/validar-jefe`,
       { method: 'POST', token: tOps }
     );
     check(
-      'jefe autoriza armado parcial',
-      parcial.status === 200 &&
-        parcial.data.pedido?.armado_parcial === true &&
-        parcial.data.pedido?.estado === 'armado' &&
-        parcial.data.pedido?.items_faltantes === 1,
-      JSON.stringify(parcial.data)
+      'jefe valida el pedido armado con faltante',
+      validadoJefe.status === 200 &&
+        validadoJefe.data.pedido?.fase === 'validado' &&
+        Boolean(validadoJefe.data.pedido?.validado_en) &&
+        validadoJefe.data.pedido?.items_faltantes === 1,
+      JSON.stringify(validadoJefe.data)
+    );
+
+    check(
+      'operario no puede totalizar → 403',
+      (
+        await req(`/api/operaciones/pedidos/${idFaltante}/totalizar`, {
+          method: 'POST',
+          token: tPedro
+        })
+      ).status === 403
     );
 
     const reporteFaltante = await req(
@@ -592,11 +603,12 @@ async function main() {
       { token: tOps }
     );
     check(
-      'reporte muestra armado parcial y faltante',
+      'reporte muestra pedido validado y faltante',
       reporteFaltante.data.pedidos?.some(
         (p) =>
           p.numero === pedidoFaltante.data?.pedido?.numero &&
-          p.armado_parcial === true
+          p.fase === 'validado' &&
+          Boolean(p.validado_en)
       ) &&
         reporteFaltante.data.items?.some(
           (i) =>
@@ -606,29 +618,64 @@ async function main() {
       JSON.stringify(reporteFaltante.data.resumen)
     );
 
-    const reabierto = await req(
-      `/api/operaciones/pedidos/${idFaltante}/reabrir`,
+    check(
+      'operario no puede ver la nota de entrega → 403',
+      (
+        await req(`/api/operaciones/pedidos/${idFaltante}/nota-entrega`, {
+          token: tPedro
+        })
+      ).status === 403
+    );
+
+    const nota = await req(
+      `/api/operaciones/pedidos/${idFaltante}/nota-entrega`,
+      { token: tOps }
+    );
+    check(
+      'nota de entrega con precios y faltante pendiente',
+      nota.status === 200 &&
+        (nota.data.pedido?.detalles || []).length === 2 &&
+        nota.data.pedido?.detalles?.some((d) => d.faltante) &&
+        typeof nota.data.pedido?.total !== 'undefined',
+      JSON.stringify(nota.data).slice(0, 400)
+    );
+
+    const totalizado = await req(
+      `/api/operaciones/pedidos/${idFaltante}/totalizar`,
       { method: 'POST', token: tOps }
     );
     check(
-      'jefe reabre armado parcial',
-      reabierto.status === 200 &&
-        reabierto.data.pedido?.armado_parcial === false &&
-        reabierto.data.pedido?.estado === 'en_proceso',
-      JSON.stringify(reabierto.data)
+      'jefe totaliza el pedido → entregado',
+      totalizado.status === 200 &&
+        totalizado.data.pedido?.fase === 'entregado' &&
+        Boolean(totalizado.data.pedido?.entregado_en) &&
+        totalizado.data.pedido?.items_faltantes === 1,
+      JSON.stringify(totalizado.data)
     );
 
-    const resuelto = await req(
-      `/api/operaciones/pedidos/${idFaltante}/items/${itemsFaltante[1]?.id}/validar`,
-      { method: 'POST', token: tPedro, body: { validado: true } }
+    const reporteEntrega = await req(
+      '/api/operaciones/reportes?desde=2020-01-01&hasta=2099-12-31',
+      { token: tOps }
     );
     check(
-      'validar ítem faltante resuelve el pedido',
-      resuelto.status === 200 &&
-        resuelto.data.pedido?.items_faltantes === 0 &&
-        resuelto.data.pedido?.armado_parcial === false &&
-        resuelto.data.pedido?.estado === 'armado',
-      JSON.stringify(resuelto.data)
+      'resumen cuenta entregados, validados y promedios',
+      Number(reporteEntrega.data.resumen?.entregados) >= 1 &&
+        Number(reporteEntrega.data.resumen?.validados) >= 1 &&
+        typeof reporteEntrega.data.resumen?.tiempo_promedio_preparacion_segundos !==
+          'undefined' &&
+        typeof reporteEntrega.data.resumen?.tiempo_promedio_entrega_segundos !==
+          'undefined',
+      JSON.stringify(reporteEntrega.data.resumen)
+    );
+
+    check(
+      'validar dos veces → 409',
+      (
+        await req(`/api/operaciones/pedidos/${idFaltante}/validar-jefe`, {
+          method: 'POST',
+          token: tOps
+        })
+      ).status === 409
     );
 
     // --- Precios por lista del cliente (cli_preciodefecto) ---------------

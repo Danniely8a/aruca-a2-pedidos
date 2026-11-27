@@ -30,21 +30,19 @@ export function formatFechaHora(value) {
   });
 }
 
-export function EstadoOps({ estado, parcial = false }) {
-  if (parcial) {
-    return (
-      <span className="ops-status ops-status-parcial">Armado parcial</span>
-    );
-  }
+export function EstadoOps({ estado, fase }) {
+  const valor = fase || estado || 'pendiente';
   const labels = {
     pendiente: 'Por asignar',
     asignado: 'Asignado',
     en_proceso: 'En proceso',
-    armado: 'Armado'
+    armado: 'Armado',
+    validado: 'Validado',
+    entregado: 'Entregado'
   };
   return (
-    <span className={`ops-status ops-status-${estado || 'pendiente'}`}>
-      {labels[estado] || estado}
+    <span className={`ops-status ops-status-${valor}`}>
+      {labels[valor] || valor}
     </span>
   );
 }

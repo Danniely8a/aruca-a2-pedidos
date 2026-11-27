@@ -104,6 +104,10 @@ export async function ensureAppSchema() {
       armado_parcial boolean not null default false,
       autorizado_por bigint references app_operarios(id) on delete set null,
       autorizado_en  timestamptz,
+      validado_en    timestamptz,
+      validado_por   bigint references app_operarios(id) on delete set null,
+      entregado_en   timestamptz,
+      entregado_por  bigint references app_operarios(id) on delete set null,
       creado_en      timestamptz not null default now(),
       actualizado_en timestamptz not null default now()
     )
@@ -147,6 +151,18 @@ export async function ensureAppSchema() {
   );
   await pool.query(
     'alter table app_operaciones_pedidos add column if not exists autorizado_en timestamptz'
+  );
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists validado_en timestamptz'
+  );
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists validado_por bigint references app_operarios(id) on delete set null'
+  );
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists entregado_en timestamptz'
+  );
+  await pool.query(
+    'alter table app_operaciones_pedidos add column if not exists entregado_por bigint references app_operarios(id) on delete set null'
   );
   await pool.query(
     'alter table app_operaciones_items add column if not exists faltante boolean not null default false'

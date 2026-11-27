@@ -43,10 +43,13 @@ export default function OpsHome() {
   }, []);
 
   const stats = useMemo(() => {
-    const pendientes = items.filter((i) => i.estado === 'pendiente').length;
-    const asignados = items.filter((i) => i.estado === 'asignado').length;
-    const enProceso = items.filter((i) => i.estado === 'en_proceso').length;
+    const pendientes = items.filter((i) => i.fase === 'pendiente').length;
+    const asignados = items.filter((i) => i.fase === 'asignado').length;
+    const enProceso = items.filter((i) => i.fase === 'en_proceso').length;
     const armados = items.filter((i) => i.estado === 'armado');
+    const porValidarJefe = items.filter((i) => i.fase === 'armado').length;
+    const porTotalizar = items.filter((i) => i.fase === 'validado').length;
+    const entregados = items.filter((i) => i.fase === 'entregado').length;
     const porValidar = items.reduce(
       (s, i) => s + Math.max(0, Number(i.items_total) - Number(i.items_validados)),
       0
@@ -62,6 +65,9 @@ export default function OpsHome() {
       asignados,
       enProceso,
       armados: armados.length,
+      porValidarJefe,
+      porTotalizar,
+      entregados,
       porValidar,
       tiempoPromedio,
       faltantes: items.filter((i) => Number(i.items_faltantes) > 0).length
@@ -101,44 +107,68 @@ export default function OpsHome() {
       )}
 
       <div className="cards dashboard-stats">
-        {esJefe && (
-          <div className="card stat stat-card">
-            <span className="stat-icon stat-icon-amber">PA</span>
-            <div>
-              <span>Por asignar</span>
-              <strong>{stats.pendientes}</strong>
+        {esJefe ? (
+          <>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-amber">PA</span>
+              <div>
+                <span>Por asignar</span>
+                <strong>{stats.pendientes}</strong>
+              </div>
             </div>
-          </div>
-        )}
-        <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-blue">AS</span>
-          <div>
-            <span>Asignados</span>
-            <strong>{stats.asignados}</strong>
-          </div>
-        </div>
-        <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-violet">EP</span>
-          <div>
-            <span>En proceso</span>
-            <strong>{stats.enProceso}</strong>
-          </div>
-        </div>
-        <div className="card stat stat-card">
-          <span className="stat-icon stat-icon-green">AR</span>
-          <div>
-            <span>Armados</span>
-            <strong>{stats.armados}</strong>
-          </div>
-        </div>
-        {!esJefe && (
-          <div className="card stat stat-card">
-            <span className="stat-icon stat-icon-amber">TP</span>
-            <div>
-              <span>Tiempo promedio</span>
-              <strong>{formatDuration(stats.tiempoPromedio)}</strong>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-violet">EP</span>
+              <div>
+                <span>En proceso</span>
+                <strong>{stats.enProceso}</strong>
+              </div>
             </div>
-          </div>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-blue">PV</span>
+              <div>
+                <span>Por validar</span>
+                <strong>{stats.porValidarJefe}</strong>
+              </div>
+            </div>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-green">PT</span>
+              <div>
+                <span>Por totalizar</span>
+                <strong>{stats.porTotalizar}</strong>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-blue">AS</span>
+              <div>
+                <span>Asignados</span>
+                <strong>{stats.asignados}</strong>
+              </div>
+            </div>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-violet">EP</span>
+              <div>
+                <span>En proceso</span>
+                <strong>{stats.enProceso}</strong>
+              </div>
+            </div>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-green">AR</span>
+              <div>
+                <span>Armados</span>
+                <strong>{stats.armados}</strong>
+              </div>
+            </div>
+            <div className="card stat stat-card">
+              <span className="stat-icon stat-icon-amber">TP</span>
+              <div>
+                <span>Tiempo promedio</span>
+                <strong>{formatDuration(stats.tiempoPromedio)}</strong>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -192,10 +222,7 @@ export default function OpsHome() {
                       </td>
                       <td>{p.vendedor?.nombre || '—'}</td>
                       <td>
-                        <EstadoOps
-                          estado={p.estado}
-                          parcial={p.armado_parcial}
-                        />
+                        <EstadoOps fase={p.fase} />
                         <FaltanteTag count={p.items_faltantes} />
                       </td>
                       {esJefe && <td>{p.operario_nombre || '—'}</td>}
@@ -208,6 +235,16 @@ export default function OpsHome() {
                         {p.asignado_en && (
                           <div className="muted ops-small">
                             Asignado {formatFechaHora(p.asignado_en)}
+                          </div>
+                        )}
+                        {p.validado_en && (
+                          <div className="muted ops-small">
+                            Validación {formatDuration(p.tiempo_validacion_segundos)}
+                          </div>
+                        )}
+                        {p.entregado_en && (
+                          <div className="muted ops-small">
+                            Entrega {formatDuration(p.tiempo_entrega_segundos)}
                           </div>
                         )}
                       </td>

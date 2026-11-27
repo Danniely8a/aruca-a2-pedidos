@@ -294,19 +294,22 @@ async function refreshEstado(db, operacionId) {
   const total = Number(rows[0]?.total || 0);
   const validados = Number(rows[0]?.validados || 0);
   const faltantes = Number(rows[0]?.faltantes || 0);
-  const ultimo = rows[0]?.ultimo || null;
 
-  if (total > 0 && total === validados && faltantes === 0) {
+  if (total > 0 && validados + faltantes === total) {
     await db.query(
       `update app_operaciones_pedidos
           set estado = 'armado',
-              finalizado_en = $1,
+              finalizado_en = now(),
               armado_parcial = false,
               autorizado_por = null,
               autorizado_en = null,
+              validado_en = null,
+              validado_por = null,
+              entregado_en = null,
+              entregado_por = null,
               actualizado_en = now()
-        where id = $2`,
-      [ultimo, operacionId]
+        where id = $1`,
+      [operacionId]
     );
   } else {
     await db.query(
@@ -348,7 +351,13 @@ const SQL_ORDEN = `
          o.armado_parcial,
          o.autorizado_por,
          au.nombre as autorizado_por_nombre,
-         o.autorizado_en
+         o.autorizado_en,
+         o.validado_en,
+         o.validado_por,
+         vu.nombre as validado_por_nombre,
+         o.entregado_en,
+         o.entregado_por,
+         en.nombre as entregado_por_nombre
     from arc_transacciones t
     left join arc_clientes c on c.cli_codigo = t.trn_responsable
     left join arc_vendedores v on v.vnd_codigo = t.trn_vendedorasignado
@@ -356,6 +365,8 @@ const SQL_ORDEN = `
     left join app_operarios op on op.id = o.operario_id
     left join app_operarios ap on ap.id = o.asignado_por
     left join app_operarios au on au.id = o.autorizado_por
+    left join app_operarios vu on vu.id = o.validado_por
+    left join app_operarios en on en.id = o.entregado_por
    where t.trn_id_auto = $1
      and t.trn_tipo = 10
      and (t.trn_status in (2, 4) or o.id is not null)
@@ -451,6 +462,40 @@ async function getOrderForActor(orderId, actor) {
 
   const iniciado = h.iniciado_en || null;
   const finalizado = h.finalizado_en || null;
+  const validado = h.validado_en || null;
+  const entregado = h.entregado_en || null;
+  const fase = entregado
+    ? 'entregado'
+    : validado
+      ? 'validado'
+      : h.estado_ops || 'pendiente';
+  const tiempoValidacion =
+    validado && finalizado
+      ? Math.max(
+          0,
+          Math.floor(
+            (new Date(validado).getTime() - new Date(finalizado).getTime()) / 1000
+          )
+        )
+      : 0;
+  const tiempoEntrega =
+    entregado && validado
+      ? Math.max(
+          0,
+          Math.floor(
+            (new Date(entregado).getTime() - new Date(validado).getTime()) / 1000
+          )
+        )
+      : 0;
+  const tiempoTotal =
+    entregado && iniciado
+      ? Math.max(
+          0,
+          Math.floor(
+            (new Date(entregado).getTime() - new Date(iniciado).getTime()) / 1000
+          )
+        )
+      : 0;
 
   return {
     id: Number(h.id),
@@ -459,6 +504,7 @@ async function getOrderForActor(orderId, actor) {
     tipo: Number(h.tipo) || 10,
     estado_a2: Number(h.estado_a2),
     estado: h.estado_ops || 'pendiente',
+    fase,
     observacion: h.observacion || '',
     cliente: {
       codigo: h.cliente_codigo || '',
@@ -478,6 +524,13 @@ async function getOrderForActor(orderId, actor) {
     iniciado_en: iniciado,
     finalizado_en: finalizado,
     duracion_segundos: duracionSegundos(iniciado, finalizado),
+    tiempo_validacion_segundos: tiempoValidacion,
+    tiempo_entrega_segundos: tiempoEntrega,
+    tiempo_total_segundos: tiempoTotal,
+    validado_en: validado,
+    validado_por_nombre: h.validado_por_nombre || null,
+    entregado_en: entregado,
+    entregado_por_nombre: h.entregado_por_nombre || null,
     armado_parcial: h.armado_parcial === true,
     autorizado_por_nombre: h.autorizado_por_nombre || null,
     autorizado_en: h.autorizado_en || null,
@@ -592,10 +645,10 @@ async function validateItem(orderId, itemId, validado, actor) {
       throw error(403, 'Este pedido no está asignado a ti');
     }
     if (!op.iniciado_en) throw error(409, 'Primero inicia el armado del pedido');
-    if (op.armado_parcial) {
+    if (op.estado === 'armado') {
       throw error(
         409,
-        'El pedido está cerrado como armado parcial. Reábrelo para modificarlo'
+        'El pedido ya está armado. El jefe de almacén debe validarlo'
       );
     }
 
@@ -720,59 +773,32 @@ async function markFaltante(orderId, itemId, faltante, motivo, actor) {
   }
 }
 
-async function authorizePartial(orderId, actor) {
+async function validateOrder(orderId, actor) {
   const client = await pool.connect();
   try {
     await client.query('begin');
-
-    const { rows: opRows } = await client.query(
-      `select o.id, o.iniciado_en, o.estado, o.armado_parcial
-         from app_operaciones_pedidos o
-        where o.trn_id_auto = $1
+    const { rows } = await client.query(
+      `select id, estado, validado_en, entregado_en
+         from app_operaciones_pedidos
+        where trn_id_auto = $1
         for update`,
       [orderId]
     );
-    const op = opRows[0];
-    if (!op) throw error(409, 'Primero asigna el pedido a un operario');
-    if (op.estado === 'armado' || op.armado_parcial) {
-      throw error(409, 'El pedido ya está cerrado');
-    }
-    if (!op.iniciado_en) throw error(409, 'Primero inicia el armado del pedido');
-
-    const { rows: counts } = await client.query(
-      `select count(*)::int as total,
-              count(*) filter (where validado)::int as validados,
-              count(*) filter (where faltante)::int as faltantes
-         from app_operaciones_items
-        where operacion_id = $1`,
-      [op.id]
-    );
-    const total = Number(counts[0]?.total || 0);
-    const validados = Number(counts[0]?.validados || 0);
-    const faltantes = Number(counts[0]?.faltantes || 0);
-
-    if (total === 0) throw error(400, 'El pedido no tiene ítems');
-    if (faltantes === 0) throw error(400, 'El pedido no tiene faltantes reportados');
-    if (validados + faltantes !== total) {
-      throw error(
-        400,
-        'Aún hay ítems sin validar ni reportar como faltantes'
-      );
+    const op = rows[0];
+    if (!op) throw error(404, 'Pedido no encontrado');
+    if (op.entregado_en) throw error(409, 'El pedido ya fue entregado');
+    if (op.validado_en) throw error(409, 'El pedido ya está validado');
+    if (op.estado !== 'armado') {
+      throw error(409, 'El pedido todavía no está armado');
     }
 
     await client.query(
       `update app_operaciones_pedidos
-          set estado = 'armado',
-              armado_parcial = true,
-              autorizado_por = $1,
-              autorizado_en = now(),
-              finalizado_en = now(),
-              actualizado_en = now()
+          set validado_en = now(), validado_por = $1, actualizado_en = now()
         where id = $2`,
       [actor.id, op.id]
     );
     await client.query('commit');
-
     return getOrderForActor(orderId, actor);
   } catch (e) {
     try {
@@ -784,13 +810,12 @@ async function authorizePartial(orderId, actor) {
   }
 }
 
-async function reopenPartial(orderId, actor) {
-  const connection = await pool.connect();
+async function deliverOrder(orderId, actor) {
+  const client = await pool.connect();
   try {
-    await connection.query('begin');
-
-    const { rows } = await connection.query(
-      `select id, armado_parcial
+    await client.query('begin');
+    const { rows } = await client.query(
+      `select id, validado_en, entregado_en
          from app_operaciones_pedidos
         where trn_id_auto = $1
         for update`,
@@ -798,31 +823,26 @@ async function reopenPartial(orderId, actor) {
     );
     const op = rows[0];
     if (!op) throw error(404, 'Pedido no encontrado');
-    if (!op.armado_parcial) {
-      throw error(400, 'El pedido no está cerrado como armado parcial');
+    if (!op.validado_en) {
+      throw error(409, 'Primero el jefe debe validar el pedido');
     }
+    if (op.entregado_en) throw error(409, 'El pedido ya fue entregado');
 
-    await connection.query(
+    await client.query(
       `update app_operaciones_pedidos
-          set estado = 'en_proceso',
-              armado_parcial = false,
-              autorizado_por = null,
-              autorizado_en = null,
-              finalizado_en = null,
-              actualizado_en = now()
-        where id = $1`,
-      [op.id]
+          set entregado_en = now(), entregado_por = $1, actualizado_en = now()
+        where id = $2`,
+      [actor.id, op.id]
     );
-    await connection.query('commit');
-
+    await client.query('commit');
     return getOrderForActor(orderId, actor);
   } catch (e) {
     try {
-      await connection.query('rollback');
+      await client.query('rollback');
     } catch {}
     throw e;
   } finally {
-    connection.release();
+    client.release();
   }
 }
 
@@ -850,7 +870,15 @@ async function listOrders({
             o.asignado_en,
             o.iniciado_en,
             o.finalizado_en,
-            o.armado_parcial,
+            o.validado_en,
+            o.entregado_en,
+            o.validado_por,
+            o.entregado_por,
+            case
+              when o.entregado_en is not null then 'entregado'
+              when o.validado_en is not null then 'validado'
+              else coalesce(o.estado, 'pendiente')
+            end as fase,
             case
               when o.id is not null then
                 (select count(*)::int from app_operaciones_items i where i.operacion_id = o.id)
@@ -874,7 +902,12 @@ async function listOrders({
       where t.trn_tipo = 10
         and (t.trn_status in (2, 4) or o.id is not null)
         and ($1::bigint is null or o.operario_id = $1)
-        and ($2::text = '' or coalesce(o.estado, 'pendiente') = $2)
+        and ($2::text = '' or
+             case
+               when o.entregado_en is not null then 'entregado'
+               when o.validado_en is not null then 'validado'
+               else coalesce(o.estado, 'pendiente')
+             end = $2)
         and ($3::text = ''
              or t.trn_documento ilike $3
              or c.cli_descripcion ilike $3)
@@ -895,12 +928,47 @@ async function listOrders({
   return rows.map((r) => {
     const iniciado = r.iniciado_en || null;
     const finalizado = r.finalizado_en || null;
+    const validado = r.validado_en || null;
+    const entregado = r.entregado_en || null;
+    const tiempoValidacion =
+      validado && finalizado
+        ? Math.max(
+            0,
+            Math.floor(
+              (new Date(validado).getTime() - new Date(finalizado).getTime()) /
+                1000
+            )
+          )
+        : 0;
+    const tiempoEntrega =
+      entregado && validado
+        ? Math.max(
+            0,
+            Math.floor(
+              (new Date(entregado).getTime() - new Date(validado).getTime()) /
+                1000
+            )
+          )
+        : 0;
+    const tiempoTotal =
+      entregado && iniciado
+        ? Math.max(
+            0,
+            Math.floor(
+              (new Date(entregado).getTime() - new Date(iniciado).getTime()) /
+                1000
+            )
+          )
+        : 0;
     return {
       id: Number(r.id),
       numero: r.numero,
       fecha: r.fecha,
       estado_a2: Number(r.estado_a2),
       estado: r.estado,
+      fase: r.fase || r.estado,
+      validado_en: validado,
+      entregado_en: entregado,
       operacion_id: r.operacion_id ? Number(r.operacion_id) : null,
       operario_id: r.operario_id ? Number(r.operario_id) : null,
       operario_nombre: r.operario_nombre || null,
@@ -920,7 +988,10 @@ async function listOrders({
       asignado_en: r.asignado_en || null,
       iniciado_en: iniciado,
       finalizado_en: finalizado,
-      duracion_segundos: duracionSegundos(iniciado, finalizado)
+      duracion_segundos: duracionSegundos(iniciado, finalizado),
+      tiempo_validacion_segundos: tiempoValidacion,
+      tiempo_entrega_segundos: tiempoEntrega,
+      tiempo_total_segundos: tiempoTotal
     };
   });
 }
@@ -941,6 +1012,10 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
             o.asignado_en,
             o.iniciado_en,
             o.finalizado_en,
+            o.validado_en,
+            o.entregado_en,
+            o.validado_por,
+            o.entregado_por,
             o.armado_parcial,
             o.autorizado_por,
             au.nombre as autorizado_por_nombre,
@@ -1002,6 +1077,13 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     operario: p.operario || 'Sin operario',
     operario_id: p.operario_id ? Number(p.operario_id) : null,
     estado: p.estado,
+    fase: p.entregado_en
+      ? 'entregado'
+      : p.validado_en
+        ? 'validado'
+        : p.estado,
+    validado_en: p.validado_en || null,
+    entregado_en: p.entregado_en || null,
     armado_parcial: p.armado_parcial === true,
     autorizado_por_nombre: p.autorizado_por_nombre || null,
     autorizado_en: p.autorizado_en || null,
@@ -1009,6 +1091,28 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     iniciado_en: p.iniciado_en,
     finalizado_en: p.finalizado_en,
     duracion_segundos: Number(p.duracion_segundos || 0),
+    tiempo_validacion_segundos:
+      p.validado_en && p.finalizado_en
+        ? Math.max(
+            0,
+            Math.floor(
+              (new Date(p.validado_en).getTime() -
+                new Date(p.finalizado_en).getTime()) /
+                1000
+            )
+          )
+        : 0,
+    tiempo_entrega_segundos:
+      p.entregado_en && p.validado_en
+        ? Math.max(
+            0,
+            Math.floor(
+              (new Date(p.entregado_en).getTime() -
+                new Date(p.validado_en).getTime()) /
+                1000
+            )
+          )
+        : 0,
     items_total: Number(p.items_total || 0),
     items_validados: Number(p.items_validados || 0),
     items_faltantes: Number(p.items_faltantes || 0)
@@ -1032,7 +1136,17 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
   }));
 
   const armados = pedidosMap.filter((p) => p.estado === 'armado');
+  const validados = pedidosMap.filter((p) => p.validado_en);
+  const entregados = pedidosMap.filter((p) => p.entregado_en);
   const tiempoTotal = armados.reduce((s, p) => s + p.duracion_segundos, 0);
+  const tiempoValidacion = validados.reduce(
+    (s, p) => s + p.tiempo_validacion_segundos,
+    0
+  );
+  const tiempoEntrega = entregados.reduce(
+    (s, p) => s + p.tiempo_entrega_segundos,
+    0
+  );
   const itemDurations = itemsMap
     .map((i) => i.duracion_segundos)
     .filter((d) => d !== null && Number.isFinite(d));
@@ -1088,13 +1202,23 @@ async function getReports({ desde, hasta, operarioId = null } = {}) {
     resumen: {
       pedidos: pedidosMap.length,
       armados: armados.length,
-      armados_parciales: armados.filter((p) => p.armado_parcial).length,
+      validados: validados.length,
+      entregados: entregados.length,
       items: pedidosMap.reduce((s, p) => s + p.items_total, 0),
       items_validados: pedidosMap.reduce((s, p) => s + p.items_validados, 0),
       items_faltantes: pedidosMap.reduce((s, p) => s + p.items_faltantes, 0),
       tiempo_total_segundos: tiempoTotal,
+      tiempo_promedio_preparacion_segundos: armados.length
+        ? Math.round(tiempoTotal / armados.length)
+        : 0,
       tiempo_promedio_pedido_segundos: armados.length
         ? Math.round(tiempoTotal / armados.length)
+        : 0,
+      tiempo_promedio_validacion_segundos: validados.length
+        ? Math.round(tiempoValidacion / validados.length)
+        : 0,
+      tiempo_promedio_entrega_segundos: entregados.length
+        ? Math.round(tiempoEntrega / entregados.length)
         : 0,
       tiempo_promedio_item_segundos: itemDurations.length
         ? Math.round(tiempoItems / itemDurations.length)
@@ -1130,8 +1254,8 @@ export const opsStore = {
   startOrder,
   validateItem,
   markFaltante,
-  authorizePartial,
-  reopenPartial,
+  validateOrder,
+  deliverOrder,
   listOrders,
   getReports
 };

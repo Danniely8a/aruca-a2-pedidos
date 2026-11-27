@@ -2,6 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { ensureAppSchema } from '../db.js';
 import { opsStore } from '../store/operations.js';
+import { store } from '../store/index.js';
+import { config } from '../config.js';
 import { signOpsToken, requireOpsAuth, requireJefe } from '../middleware/opsAuth.js';
 import { asyncHandler, ApiError } from '../middleware/errors.js';
 
@@ -82,31 +84,22 @@ router.get(
       pedido.operario_id != null &&
       Number(pedido.operario_id) === Number(req.operario.id);
     const puedeOperar = esJefe || asignadoAmi;
-    const abierto = pedido.estado !== 'armado' && !pedido.armado_parcial;
+    const abierto = pedido.estado !== 'armado';
 
     res.json({
       pedido,
       permisos: {
-        asignar: esJefe && pedido.estado !== 'armado',
+        asignar: esJefe && abierto,
         iniciar:
           puedeOperar &&
           Boolean(pedido.operacion_id) &&
           !pedido.iniciado_en &&
-          pedido.estado !== 'armado',
-        validar:
-          puedeOperar && Boolean(pedido.iniciado_en) && !pedido.armado_parcial,
-        faltante:
-          puedeOperar &&
-          Boolean(pedido.iniciado_en) &&
-          pedido.estado !== 'armado' &&
-          !pedido.armado_parcial,
-        autorizar_parcial:
-          esJefe &&
-          abierto &&
-          Boolean(pedido.iniciado_en) &&
-          pedido.items_faltantes > 0 &&
-          pedido.items_validados + pedido.items_faltantes === pedido.items_total,
-        reabrir: esJefe && pedido.armado_parcial === true
+          abierto,
+        validar: puedeOperar && Boolean(pedido.iniciado_en) && abierto,
+        faltante: puedeOperar && Boolean(pedido.iniciado_en) && abierto,
+        validar_jefe: esJefe && pedido.fase === 'armado',
+        totalizar: esJefe && pedido.fase === 'validado',
+        nota: esJefe && ['validado', 'entregado'].includes(pedido.fase)
       }
     });
   })
@@ -167,23 +160,57 @@ router.post(
 );
 
 router.post(
-  '/pedidos/:id/armado-parcial',
+  '/pedidos/:id/validar-jefe',
   requireJefe,
   asyncHandler(async (req, res) => {
-    const pedido = await opsStore.authorizePartial(
-      req.params.id,
-      req.operario
-    );
+    const pedido = await opsStore.validateOrder(req.params.id, req.operario);
     res.json({ pedido });
   })
 );
 
 router.post(
-  '/pedidos/:id/reabrir',
+  '/pedidos/:id/totalizar',
   requireJefe,
   asyncHandler(async (req, res) => {
-    const pedido = await opsStore.reopenPartial(req.params.id, req.operario);
+    const pedido = await opsStore.deliverOrder(req.params.id, req.operario);
     res.json({ pedido });
+  })
+);
+
+router.get(
+  '/pedidos/:id/nota-entrega',
+  requireJefe,
+  asyncHandler(async (req, res) => {
+    const ops = await opsStore.getOrderForActor(req.params.id, req.operario);
+    if (!ops) throw new ApiError(404, 'Pedido no encontrado');
+    if (!ops.validado_en) {
+      throw new ApiError(
+        409,
+        'El pedido debe estar validado por el jefe de almacén'
+      );
+    }
+
+    const pedido = await store.getOrder(req.params.id);
+    if (!pedido) throw new ApiError(404, 'Pedido no encontrado en el A2');
+    const empresa = await store.getCompany();
+    const faltantes = new Map(
+      (ops.items || []).map((i) => [Number(i.linea), i])
+    );
+    const detalles = (pedido.detalles || []).map((d) => {
+      const extra = faltantes.get(Number(d.linea));
+      return {
+        ...d,
+        faltante: Boolean(extra?.faltante),
+        motivo_faltante: extra?.motivo_faltante || ''
+      };
+    });
+
+    res.json({
+      pedido: { ...pedido, detalles, fase: ops.fase },
+      empresa,
+      currency: config.currency,
+      ops
+    });
   })
 );
 

@@ -5,6 +5,7 @@ import OpsLayout from './OpsLayout.jsx';
 import OpsHome from './OpsHome.jsx';
 import OpsOrders from './OpsOrders.jsx';
 import OpsOrderDetail from './OpsOrderDetail.jsx';
+import OpsDeliveryNote from './OpsDeliveryNote.jsx';
 import OpsWorkers from './OpsWorkers.jsx';
 import OpsReports from './OpsReports.jsx';
 
@@ -50,6 +51,10 @@ export default function OperationsApp() {
             <Route path="/operaciones/pedidos" element={<OpsOrders />} />
             <Route path="/operaciones/pedidos/:id" element={<OpsOrderDetail />} />
             <Route element={<OpsSoloJefe />}>
+              <Route
+                path="/operaciones/pedidos/:id/nota"
+                element={<OpsDeliveryNote />}
+              />
               <Route path="/operaciones/operarios" element={<OpsWorkers />} />
               <Route path="/operaciones/reportes" element={<OpsReports />} />
             </Route>
